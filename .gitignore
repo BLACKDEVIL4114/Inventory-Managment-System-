@@ -45,7 +45,7 @@ Thumbs.db
 *.swo
 
 # Project specific
-data_set/data.csv
+# data_set/data.csv (Removed from ignore to allow demo data tracking)
 trained_model.pkl
 *.png
 *.pdf

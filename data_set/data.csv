@@ -1,0 +1,9 @@
+product_id,product_name,quantity_stock,minimum_stock_level,total_revenue,expiry_date
+1,Industrial Motor XL,65,15,287500,01/01/2028
+2,Copper Wire 100m,100,25,200000,01/01/2027
+3,Steel Bolts M8,300,50,500000,01/01/2030
+4,Hydraulic Oil 20L,30,10,25000,01/06/2026
+5,Safety Helmet,120,30,75000,01/01/2029
+6,Welding Rods E6013,100,20,0,15/05/2026
+7,Bearing 6204-2RS,200,40,0,01/01/2027
+8,LED Panel 40W,50,15,0,01/01/2028
