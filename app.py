@@ -23,6 +23,13 @@ app.config['SESSION_COOKIE_SECURE'] = False  # Set to True only when using HTTPS
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///inventory.db')
+
+# Vercel-specific database adjustments
+if os.environ.get('VERCEL'):
+    if app.config['SQLALCHEMY_DATABASE_URI'].startswith('sqlite:///'):
+        # SQLite must be in /tmp/ on Vercel to be writable (though not persistent)
+        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////tmp/inventory.db'
+
 if app.config['SQLALCHEMY_DATABASE_URI'].startswith("postgres://"):
     app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace("postgres://", "postgresql://", 1)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -447,6 +454,15 @@ def profile():
                            title='My Profile',
                            form=form,
                            total_operations=total_operations)
+
+@app.route("/health")
+def health_check():
+    return jsonify({
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "database_uri": app.config['SQLALCHEMY_DATABASE_URI'].split('@')[-1], # Mask credentials
+        "vercel_env": bool(os.environ.get('VERCEL'))
+    }), 200
 
 @app.route("/")
 @app.route("/dashboard")
