@@ -158,7 +158,7 @@ body {
     cursor: pointer;
     box-shadow: 0 4px 10px rgba(220, 38, 38, 0.2);
     position: relative;
-    z-index: 1001; /* Above nav-wrapper */
+    z-index: 10000 !important; /* Above nav-wrapper which is 9999 */
 }
 
 .card:has(.dropdown) {
@@ -640,14 +640,16 @@ code {
         left: 0;
         right: 0;
         bottom: 0;
-        background: #ffffff;
-        padding: 5rem 1.5rem 2rem;
-        z-index: 999;
+        background-color: #ffffff !important;
+        background: #ffffff !important;
+        padding: 80px 1.5rem 2rem !important; /* Start below the top bar */
+        z-index: 9999 !important;
         overflow-y: auto;
+        opacity: 1 !important;
     }
 
     .nav-wrapper.show {
-        display: block;
+        display: block !important;
         animation: slideInRight 0.3s ease forwards;
     }
 
