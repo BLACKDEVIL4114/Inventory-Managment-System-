@@ -1,90 +1,140 @@
 {% extends "base.html" %}
-{% block title %}{{ title }} - IMS Dashboard{% endblock %}
+{% block title %}{{ title }} - Inventory Tracker{% endblock %}
 {% block content %}
-<div class="card mb-6">
-    <div class="card-header">
-        <h1 class="card-title">
-            <i class="fas fa-edit text-primary"></i>
-            {{ title }}
-        </h1>
-        <p class="card-subtitle">
-            Create or update product details in the system.
-        </p>
-    </div>
-</div>
+<div class="main-container" style="max-width: 650px; margin: 0 auto;">
+    <div class="premium-card">
+        <div class="brand-row">
+            <div class="brand-icon"><i class="fas fa-box-open"></i></div>
+            <span class="brand-label">Product Management</span>
+        </div>
 
-<div class="card" style="max-width: 600px; margin: 2rem auto;">
-    <div class="card-body">
+        <div class="premium-form-header">
+            <h2 class="premium-form-title">{{ title }}</h2>
+            <p class="premium-form-subtitle">Complete the information below to {{ 'update' if 'Edit' in title else 'create' }} the product.</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">
+                        <i class="fas fa-info-circle"></i> {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
         <form method="POST" action="">
             {{ form.hidden_tag() }}
-            <div class="form-group mb-3">
-                {{ form.name.label(class="form-label") }}
-                {% if form.name.errors %}
-                    {{ form.name(class="form-control is-invalid") }}
-                    <div class="invalid-feedback">
-                        {% for error in form.name.errors %}
-                            <span>{{ error }}</span>
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    {{ form.name(class="form-control") }}
-                {% endif %}
+            
+            <div class="grid-2 gap-4">
+                <!-- Product Name -->
+                <div class="premium-field">
+                    <label class="premium-field-label">
+                        <div class="label-icon"><i class="fas fa-tag"></i></div>
+                        Product Name
+                    </label>
+                    {% if form.name.errors %}
+                        {{ form.name(class="form-control is-invalid", placeholder="e.g. Industrial Gasket") }}
+                        <div class="invalid-feedback">
+                            {% for error in form.name.errors %}<span>{{ error }}</span>{% endfor %}
+                        </div>
+                    {% else %}
+                        {{ form.name(class="form-control", placeholder="e.g. Industrial Gasket") }}
+                    {% endif %}
+                </div>
+
+                <!-- SKU -->
+                <div class="premium-field">
+                    <label class="premium-field-label">
+                        <div class="label-icon"><i class="fas fa-barcode"></i></div>
+                        SKU / Code
+                    </label>
+                    {% if form.sku.errors %}
+                        {{ form.sku(class="form-control is-invalid", placeholder="e.g. PRD-001") }}
+                        <div class="invalid-feedback">
+                            {% for error in form.sku.errors %}<span>{{ error }}</span>{% endfor %}
+                        </div>
+                    {% else %}
+                        {{ form.sku(class="form-control", placeholder="e.g. PRD-001") }}
+                    {% endif %}
+                </div>
             </div>
-            <div class="form-group mb-3">
-                {{ form.sku.label(class="form-label") }}
-                {% if form.sku.errors %}
-                    {{ form.sku(class="form-control is-invalid") }}
-                    <div class="invalid-feedback">
-                        {% for error in form.sku.errors %}
-                            <span>{{ error }}</span>
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    {{ form.sku(class="form-control") }}
-                {% endif %}
+
+            <div class="grid-2 gap-4">
+                <!-- Category -->
+                <div class="premium-field">
+                    <label class="premium-field-label">
+                        <div class="label-icon"><i class="fas fa-list"></i></div>
+                        Category
+                    </label>
+                    {% if form.category.errors %}
+                        {{ form.category(class="form-control is-invalid") }}
+                        <div class="invalid-feedback">
+                            {% for error in form.category.errors %}<span>{{ error }}</span>{% endfor %}
+                        </div>
+                    {% else %}
+                        {{ form.category(class="form-control") }}
+                    {% endif %}
+                </div>
+
+                <!-- Unit -->
+                <div class="premium-field">
+                    <label class="premium-field-label">
+                        <div class="label-icon"><i class="fas fa-weight-hanging"></i></div>
+                        Unit of Measure
+                    </label>
+                    {% if form.unit.errors %}
+                        {{ form.unit(class="form-control is-invalid") }}
+                        <div class="invalid-feedback">
+                            {% for error in form.unit.errors %}<span>{{ error }}</span>{% endfor %}
+                        </div>
+                    {% else %}
+                        {{ form.unit(class="form-control") }}
+                    {% endif %}
+                </div>
             </div>
-            <div class="form-group mb-3">
-                {{ form.category.label(class="form-label") }}
-                {% if form.category.errors %}
-                    {{ form.category(class="form-control is-invalid") }}
-                    <div class="invalid-feedback">
-                        {% for error in form.category.errors %}
-                            <span>{{ error }}</span>
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    {{ form.category(class="form-control") }}
-                {% endif %}
+
+            <!-- Min Stock Level -->
+            <div class="grid-2 gap-4">
+                <div class="premium-field">
+                    <label class="premium-field-label">
+                        <div class="label-icon"><i class="fas fa-exclamation-circle"></i></div>
+                        Minimum Stock Level
+                    </label>
+                    {% if form.min_stock_level.errors %}
+                        {{ form.min_stock_level(class="form-control is-invalid", placeholder="0") }}
+                        <div class="invalid-feedback">
+                            {% for error in form.min_stock_level.errors %}<span>{{ error }}</span>{% endfor %}
+                        </div>
+                    {% else %}
+                        {{ form.min_stock_level(class="form-control", placeholder="0") }}
+                    {% endif %}
+                </div>
+
+                <!-- Warehouse Selection -->
+                <div class="premium-field">
+                    <label class="premium-field-label">
+                        <div class="label-icon"><i class="fas fa-warehouse"></i></div>
+                        Initial Warehouse
+                    </label>
+                    {% if form.warehouse_id.errors %}
+                        {{ form.warehouse_id(class="form-control is-invalid") }}
+                        <div class="invalid-feedback">
+                            {% for error in form.warehouse_id.errors %}<span>{{ error }}</span>{% endfor %}
+                        </div>
+                    {% else %}
+                        {{ form.warehouse_id(class="form-control") }}
+                    {% endif %}
+                </div>
             </div>
-            <div class="form-group mb-3">
-                {{ form.unit.label(class="form-label") }}
-                {% if form.unit.errors %}
-                    {{ form.unit(class="form-control is-invalid") }}
-                    <div class="invalid-feedback">
-                        {% for error in form.unit.errors %}
-                            <span>{{ error }}</span>
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    {{ form.unit(class="form-control") }}
-                {% endif %}
-            </div>
-            <div class="form-group mb-3">
-                {{ form.min_stock_level.label(class="form-label") }}
-                {% if form.min_stock_level.errors %}
-                    {{ form.min_stock_level(class="form-control is-invalid") }}
-                    <div class="invalid-feedback">
-                        {% for error in form.min_stock_level.errors %}
-                            <span>{{ error }}</span>
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    {{ form.min_stock_level(class="form-control") }}
-                {% endif %}
-            </div>
-            <div class="form-group mb-3">
-                {{ form.submit(class="btn btn-primary") }}
-                <a href="{{ url_for('products') }}" class="btn btn-outline ml-2">Cancel</a>
+
+            <div class="form-group mt-6">
+                <button type="submit" class="btn-premium">
+                    <i class="fas fa-check-circle"></i> Save Product Details
+                </button>
+                <a href="{{ url_for('products') }}" class="btn-premium" style="background: var(--gray-100); color: var(--gray-600); box-shadow: none; margin-top: 0.75rem;">
+                    <i class="fas fa-times"></i> Cancel
+                </a>
             </div>
         </form>
     </div>

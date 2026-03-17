@@ -1,51 +1,68 @@
 {% extends "base.html" %}
-{% block title %}{{ title }} - IMS Dashboard{% endblock %}
+{% block title %}{{ title }} - Inventory Tracker{% endblock %}
 {% block content %}
-<div class="card mb-6">
-    <div class="card-header">
-        <h1 class="card-title">
-            <i class="fas fa-warehouse text-primary"></i>
-            {{ title }}
-        </h1>
-        <p class="card-subtitle">
-            Create or update storage locations.
-        </p>
-    </div>
-</div>
+<div class="main-container" style="max-width: 550px; margin: 0 auto;">
+    <div class="premium-card">
+        <div class="brand-row">
+            <div class="brand-icon"><i class="fas fa-warehouse"></i></div>
+            <span class="brand-label">Warehouse Setup</span>
+        </div>
 
-<div class="card" style="max-width: 600px; margin: 2rem auto;">
-    <div class="card-body">
+        <div class="premium-form-header">
+            <h2 class="premium-form-title">{{ title }}</h2>
+            <p class="premium-form-subtitle">Define the storage location details below.</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">
+                        <i class="fas fa-info-circle"></i> {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
         <form method="POST" action="">
             {{ form.hidden_tag() }}
-            <div class="form-group mb-3">
-                {{ form.name.label(class="form-label") }}
+            
+            <div class="premium-field">
+                <label class="premium-field-label">
+                    <div class="label-icon"><i class="fas fa-tag"></i></div>
+                    Warehouse Name
+                </label>
                 {% if form.name.errors %}
-                    {{ form.name(class="form-control is-invalid") }}
+                    {{ form.name(class="form-control is-invalid", placeholder="e.g. Main Warehouse A") }}
                     <div class="invalid-feedback">
-                        {% for error in form.name.errors %}
-                            <span>{{ error }}</span>
-                        {% endfor %}
+                        {% for error in form.name.errors %}<span>{{ error }}</span>{% endfor %}
                     </div>
                 {% else %}
-                    {{ form.name(class="form-control") }}
+                    {{ form.name(class="form-control", placeholder="e.g. Main Warehouse A") }}
                 {% endif %}
             </div>
-            <div class="form-group mb-3">
-                {{ form.location.label(class="form-label") }}
+
+            <div class="premium-field">
+                <label class="premium-field-label">
+                    <div class="label-icon"><i class="fas fa-map-marker-alt"></i></div>
+                    Storage Location
+                </label>
                 {% if form.location.errors %}
-                    {{ form.location(class="form-control is-invalid") }}
+                    {{ form.location(class="form-control is-invalid", placeholder="e.g. Zone 4, Row B") }}
                     <div class="invalid-feedback">
-                        {% for error in form.location.errors %}
-                            <span>{{ error }}</span>
-                        {% endfor %}
+                        {% for error in form.location.errors %}<span>{{ error }}</span>{% endfor %}
                     </div>
                 {% else %}
-                    {{ form.location(class="form-control") }}
+                    {{ form.location(class="form-control", placeholder="e.g. Zone 4, Row B") }}
                 {% endif %}
             </div>
-            <div class="form-group mb-3">
-                {{ form.submit(class="btn btn-primary") }}
-                <a href="{{ url_for('warehouses') }}" class="btn btn-outline ml-2">Cancel</a>
+
+            <div class="form-group mt-6">
+                <button type="submit" class="btn-premium">
+                    <i class="fas fa-check-circle"></i> Save Warehouse
+                </button>
+                <a href="{{ url_for('warehouses') }}" class="btn-premium" style="background: var(--gray-100); color: var(--gray-600); box-shadow: none; margin-top: 0.75rem;">
+                    <i class="fas fa-times"></i> Cancel
+                </a>
             </div>
         </form>
     </div>

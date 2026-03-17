@@ -1,272 +1,206 @@
 {% extends "base.html" %}
-{% block title %}Dashboard – IMS{% endblock %}
+{% block title %}Dashboard – Inventory Tracker{% endblock %}
 
 {% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-.kpi-card {
-    background: var(--white);
-    padding: 1.25rem 1.5rem;
-    border-radius: var(--border-radius);
-    border: 1px solid var(--gray-100);
-    box-shadow: var(--shadow);
-    transition: var(--transition);
-    position: relative; 
-    overflow: hidden;
-}
-.kpi-card:hover { 
-    transform: translateY(-3px); 
-    box-shadow: var(--shadow-lg); 
-}
-.kpi-title { 
-    font-size: 0.75rem; 
-    font-weight: 700; 
-    color: var(--gray-600);
-    text-transform: uppercase; 
-    letter-spacing: 0.05em; 
-    margin-bottom: 0.4rem; 
-}
-.kpi-value { font-size: 2rem; font-weight: 800; color: var(--gray-900); }
-.kpi-sub   { font-size: 0.75rem; color: var(--gray-600); margin-top: 0.25rem; }
-.kpi-up    { color: #10b981; font-weight: 700; }
-.kpi-down  { color: #dc2626; font-weight: 700; }
-
-.action-card {
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    gap: 0.5rem; padding: 1.25rem 1rem;
-    border-radius: var(--border-radius);
-    border: 1.5px solid; text-decoration: none;
-    font-weight: 700; font-size: 0.85rem;
-    text-align: center; transition: var(--transition);
-    color: inherit;
-}
-.action-card:hover { transform: translateY(-2px); }
+    .insight-pill {
+        padding: 0.6rem 1rem;
+        border-radius: 12px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+        border: 1px solid rgba(0,0,0,0.05);
+        background: white;
+    }
+    .insight-pill i { font-size: 1rem; }
+    .insight-pill.warning { border-left: 4px solid #f59e0b; color: #92400e; }
+    .insight-pill.danger { border-left: 4px solid #dc2626; color: #991b1b; }
+    .insight-pill.success { border-left: 4px solid #10b981; color: #065f46; }
+    .insight-pill.info { border-left: 4px solid #3b82f6; color: #1e40af; }
 </style>
 {% endblock %}
 
 {% block content %}
-<!-- SECTION 1: Page header -->
-<div class="card mb-6" style="display:flex; justify-content:space-between; align-items:center;">
-    <div>
-        <h1 style="color:var(--gray-900); font-size:1.75rem; font-weight:800; display:flex; align-items:center; gap:0.75rem;">
-            <i class="fas fa-chart-bar" style="color:var(--primary-color);"></i> Inventory Dashboard
-        </h1>
-        <p class="text-muted" style="font-size: 0.88rem; margin-top:0.25rem;">
-            Welcome back, {{ current_user.username }}! &mdash; {{ now.strftime('%d %b %Y') }}
-        </p>
-    </div>
-    <div>
-        <span class="badge" style="background:var(--gray-900); color:var(--white);">MANAGER</span>
-    </div>
-</div>
-
-<!-- SECTION 2: 8 KPI cards in grid grid-4 (2 rows) -->
-<div class="grid grid-4 mb-6">
-    <!-- Row 1 -->
-    <div class="kpi-card" style="border-left: 4px solid #dc2626;">
-        <div class="kpi-title">TOTAL PRODUCTS</div>
-        <div class="kpi-value">{{ total_products|default(0) }}</div>
-        <div class="kpi-sub">in stock</div>
-    </div>
-    <div class="kpi-card" style="border-left: 4px solid #f59e0b;">
-        <div class="kpi-title">LOW / OUT OF STOCK</div>
-        <div class="kpi-value">{{ low_stock_count|default(0) }} / {{ out_of_stock_count|default(0) }}</div>
-        <div class="kpi-sub">items need attention</div>
-    </div>
-    <div class="kpi-card" style="border-left: 4px solid #10b981;">
-        <div class="kpi-title">PENDING RECEIPTS</div>
-        <div class="kpi-value">{{ pending_receipts|default(0) }}</div>
-        <div class="kpi-sub">waiting to arrive</div>
-    </div>
-    <div class="kpi-card" style="border-left: 4px solid #3b82f6;">
-        <div class="kpi-title">PENDING DELIVERIES</div>
-        <div class="kpi-value">{{ pending_deliveries|default(0) }}</div>
-        <div class="kpi-sub">outbound queue</div>
-    </div>
-    
-    <!-- Row 2 -->
-    <div class="kpi-card" style="border-left: 4px solid #7c3aed;">
-        <div class="kpi-title">INTERNAL TRANSFERS</div>
-        <div class="kpi-value">{{ internal_transfers|default(0) }}</div>
-        <div class="kpi-sub">scheduled</div>
-    </div>
-    <div class="kpi-card" style="border-left: 4px solid #10b981;">
-        <div class="kpi-title">REVENUE THIS MONTH</div>
-        <div class="kpi-value">₹{{ "{:,.0f}".format(total_revenue|default(0)) }}</div>
-        <div class="kpi-sub">
-            {% if growth_is_positive %}
-                <span class="kpi-up">↑ {{ growth_trend|default('—') }}</span>
-            {% else %}
-                <span class="kpi-down">↓ {{ growth_trend|default('—') }}</span>
-            {% endif %}
+<div class="dashboard-wrapper">
+    <!-- Page Header & Key Stats -->
+    <div class="premium-card" style="padding: 2.5rem;">
+        <div class="brand-row" style="margin-bottom: 2rem;">
+            <div class="brand-icon"><i class="fas fa-chart-line"></i></div>
+            <span class="brand-label" style="letter-spacing: 0.05em; text-transform: uppercase; font-size: 0.9rem;">Enterprise Business Intelligence</span>
         </div>
-    </div>
-    <div class="kpi-card" style="border-left: 4px solid #f59e0b;">
-        <div class="kpi-title">INVENTORY HEALTH</div>
-        <div class="kpi-value">{{ health_score|default(0) }}/100</div>
-        <div class="kpi-sub">stock turnover rate</div>
-    </div>
-    <div class="kpi-card" style="border-left: 4px solid #dc2626;">
-        <div class="kpi-title">TODAY'S OPERATIONS</div>
-        <div class="kpi-value">{{ today_operations|default(0) }}</div>
-        <div class="kpi-sub">receipts + deliveries + transfers</div>
-    </div>
-</div>
-
-<!-- SECTION 3: Quick Actions card (full width) -->
-<div class="card mb-6">
-    <h3 class="card-title mb-4">
-        <i class="fas fa-bolt text-primary"></i> Quick Actions
-    </h3>
-    <div class="grid grid-4" style="gap: 0.75rem;">
-        <a href="{{ url_for('new_operation', op_type='Receipt') }}" class="action-card" style="border-color:rgba(16,185,129,0.3); background-color:rgba(16,185,129,0.05); color:var(--gray-900);">
-            <i class="fas fa-arrow-down" style="color:#10b981; font-size:1.5rem;"></i>
-            <span>New Receipt<br><span style="font-size:0.75rem; font-weight:400; color:var(--gray-600);">Incoming stock</span></span>
-        </a>
-        <a href="{{ url_for('new_operation', op_type='Delivery') }}" class="action-card" style="border-color:rgba(220,38,38,0.25); background-color:rgba(220,38,38,0.04); color:var(--gray-900);">
-            <i class="fas fa-arrow-up" style="color:#dc2626; font-size:1.5rem;"></i>
-            <span>New Delivery<br><span style="font-size:0.75rem; font-weight:400; color:var(--gray-600);">Outgoing stock</span></span>
-        </a>
-        <a href="{{ url_for('new_operation', op_type='Transfer') }}" class="action-card" style="border-color:rgba(245,158,11,0.3); background-color:rgba(245,158,11,0.05); color:var(--gray-900);">
-            <i class="fas fa-exchange-alt" style="color:#f59e0b; font-size:1.5rem;"></i>
-            <span>Transfer<br><span style="font-size:0.75rem; font-weight:400; color:var(--gray-600);">Between warehouses</span></span>
-        </a>
-        <a href="{{ url_for('new_operation', op_type='Adjustment') }}" class="action-card" style="border-color:rgba(59,130,246,0.25); background-color:rgba(59,130,246,0.04); color:var(--gray-900);">
-            <i class="fas fa-sliders-h" style="color:#3b82f6; font-size:1.5rem;"></i>
-            <span>Adjustment<br><span style="font-size:0.75rem; font-weight:400; color:var(--gray-600);">Fix physical count</span></span>
-        </a>
-    </div>
-</div>
-
-<!-- SECTION 4: grid grid-2 (left + right columns) -->
-<div class="grid grid-2" style="gap: 1.5rem;">
-    <!-- LEFT COLUMN -->
-    <div>
-        <!-- Card A: Low Stock Alerts -->
-        <div class="card mb-4">
-            <h3 class="card-title mb-3" style="font-size:1.25rem;">
-                <i class="fas fa-exclamation-triangle" style="color:#f59e0b"></i>
-                Low Stock Alerts
-            </h3>
-            {% if low_stock_list %}
-                <div style="display:flex; flex-direction:column; gap:0.75rem;">
-                {% for item in low_stock_list %}
-                    <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:0.75rem; {% if not loop.last %}border-bottom:1px solid var(--gray-100);{% endif %}">
-                        <div style="display:flex; align-items:center; gap:0.5rem;">
-                            <div style="width:8px; height:8px; border-radius:50%; background-color: {% if item.status in ['OUT', 'CRITICAL'] %}#dc2626{% else %}#f59e0b{% endif %};"></div>
-                            <span style="font-weight:700; color:var(--gray-800); font-size:0.9rem;">{{ item.name }}</span>
-                        </div>
-                        <div style="display:flex; align-items:center; gap:1rem;">
-                            <span class="text-muted" style="font-size:0.85rem;">{{ item.qty }} {{ item.unit }}</span>
-                            <span class="badge {% if item.status in ['OUT', 'CRITICAL'] %}badge-danger{% else %}badge-warning{% endif %}" style="font-size:0.65rem;">{{ item.status }}</span>
-                        </div>
-                    </div>
-                {% endfor %}
-                </div>
-            {% else %}
-                <p class="text-muted" style="font-size:0.85rem;">
-                    All products are well stocked.
-                </p>
-            {% endif %}
+        
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2.5rem;">
+            <div>
+                <h1 class="premium-form-title" style="font-size: 2rem; margin-bottom: 0.5rem; letter-spacing: -0.02em;">Inventory Analytics</h1>
+                <p class="premium-form-subtitle" style="font-size: 0.95rem;">Welcome back, <strong>{{ current_user.username }}</strong>. Here's your system overview for <span class="text-primary">{{ current_date }}</span>.</p>
+            </div>
+            <div class="badge badge-info" style="font-size: 0.65rem; padding: 0.5rem 1rem; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);">{{ current_user.role|upper }}</div>
         </div>
 
-        <!-- Card B: Warehouse Capacity -->
-        <div class="card">
-            <h3 class="card-title mb-3" style="font-size:1.25rem;">
-                <i class="fas fa-warehouse text-primary"></i>
-                Warehouse Capacity
-            </h3>
-            {% if warehouse_capacities %}
-                {% for wh in warehouse_capacities %}
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem;">
-                        <span style="font-size:0.85rem; font-weight:600; color:var(--gray-700);">{{ wh.name }}</span>
-                        <span style="font-size:0.8rem; font-weight:700; color:var(--gray-900);">{{ wh.pct }}%</span>
-                    </div>
-                    <div style="height:6px; background:var(--gray-200); border-radius:99px; overflow:hidden; margin-bottom:1rem;">
-                        <div style="height:100%; border-radius:99px; width:{{ wh.pct }}%;
-                             background: {% if wh.pct >= 80 %}#dc2626
-                                         {% elif wh.pct >= 50 %}#f59e0b
-                                         {% else %}#10b981{% endif %};">
-                        </div>
-                    </div>
-                {% endfor %}
-            {% else %}
-                <p class="text-muted" style="font-size:0.85rem;">
-                    No warehouses configured.
-                </p>
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- RIGHT COLUMN -->
-    <div>
-        <!-- Card: Recent Operations -->
-        <div class="card" style="height:100%;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-                <h3 class="card-title" style="font-size:1.25rem; margin-bottom:0;">
-                    <i class="fas fa-history text-primary"></i> Recent Operations
-                </h3>
-                <a href="{{ url_for('operations') }}" class="btn btn-outline btn-sm" style="padding:0.4rem 0.75rem; font-size:0.75rem; border-radius:6px; border:1px solid var(--gray-200); color:var(--gray-700); background:var(--white);">
-                    View All
-                </a>
+        <div class="grid grid-4" style="gap: 1.5rem;">
+            <div class="stats-card">
+                <div class="summary-title" style="font-size: 0.65rem; font-weight: 800; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.05em;">Total Catalog</div>
+                <div class="stats-number">{{ total_products|default(0) }}</div>
+                <div class="text-muted" style="font-size: 0.6rem; font-weight: 700;">UNIQUE SKUs</div>
             </div>
 
-            {% if recent_operations %}
-                <div style="overflow-x:auto;">
-                    <table class="table" style="width:100%; text-align:left; border-collapse:collapse;">
+            <div class="stats-card">
+                <div class="summary-title" style="font-size: 0.65rem; font-weight: 800; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.05em;">Attention Needed</div>
+                <div class="stats-number" style="color: #dc2626;">{{ low_stock_count|default(0) }}</div>
+                <div class="text-muted" style="font-size: 0.6rem; font-weight: 800; color: #dc2626;">STOCK ALERTS</div>
+            </div>
+
+            <div class="stats-card">
+                <div class="summary-title" style="font-size: 0.65rem; font-weight: 800; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.05em;">Estimated Revenue</div>
+                <div class="stats-number">₹{{ "{:,.0f}".format(total_revenue|default(0)) }}</div>
+                <div class="text-muted" style="font-size: 0.6rem; font-weight: 700;">
+                    {% if growth_is_positive %}
+                        <span style="color: #10b981;"><i class="fas fa-arrow-up"></i> {{ growth_trend|default('0%') }} GROWTH</span>
+                    {% else %}
+                        <span style="color: #dc2626;"><i class="fas fa-arrow-down"></i> {{ growth_trend|default('0%') }} DECLINE</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="stats-card">
+                <div class="summary-title" style="font-size: 0.65rem; font-weight: 800; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.05em;">System Performance</div>
+                <div class="stats-number" style="color: #10b981;">{{ health_score|default(0) }}%</div>
+                <div class="text-muted" style="font-size: 0.6rem; font-weight: 700;">HEALTH INDEX</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Insights -->
+    {% if smart_insights %}
+    <div style="margin-bottom: 2.5rem;">
+        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem;">
+            <div style="width: 28px; height: 28px; background: var(--accent-gradient); border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.8rem; box-shadow: 0 4px 10px rgba(220,38,38,0.2);">
+                <i class="fas fa-bolt"></i>
+            </div>
+            <h3 class="premium-form-title" style="font-size: 1rem; margin: 0; letter-spacing: -0.01em;">AI Orchestrated Insights</h3>
+        </div>
+        <div class="grid grid-2" style="gap: 1.25rem;">
+            {% for insight in smart_insights %}
+            <div style="background: white; padding: 1.25rem; border-radius: var(--border-radius-lg); border: 1px solid var(--gray-100); box-shadow: 0 4px 15px rgba(0,0,0,0.02); display: flex; align-items: flex-start; gap: 1rem; transition: transform 0.3s ease;" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='translateY(0)'">
+                <div style="width: 8px; height: 8px; background: var(--primary-color); border-radius: 50%; margin-top: 6px; flex-shrink: 0;"></div>
+                <p style="font-size: 0.88rem; color: var(--gray-700); line-height: 1.6; font-weight: 500;">{{ insight }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Core Operations -->
+    <div style="margin-bottom: 2.5rem;">
+        <h3 class="premium-form-title" style="font-size: 0.85rem; margin-bottom: 1.25rem; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.1em; text-align: center;">Quick Operations</h3>
+        <div class="grid grid-4" style="gap: 1.25rem;">
+            <a href="{{ url_for('new_operation', op_type='Receipt') }}" class="quick-action-tile">
+                <div class="tile-icon" style="background: rgba(16, 185, 129, 0.08); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.1);"><i class="fas fa-plus-circle"></i></div>
+                <span>Stock Receipt</span>
+            </a>
+            <a href="{{ url_for('new_operation', op_type='Delivery') }}" class="quick-action-tile">
+                <div class="tile-icon" style="background: rgba(220, 38, 38, 0.08); color: #dc2626; border: 1px solid rgba(220, 38, 38, 0.1);"><i class="fas fa-minus-circle"></i></div>
+                <span>Outbound Delivery</span>
+            </a>
+            <a href="{{ url_for('new_operation', op_type='Transfer') }}" class="quick-action-tile">
+                <div class="tile-icon" style="background: rgba(245, 158, 11, 0.08); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.1);"><i class="fas fa-exchange-alt"></i></div>
+                <span>Warehouse Move</span>
+            </a>
+            <a href="{{ url_for('new_operation', op_type='Adjustment') }}" class="quick-action-tile">
+                <div class="tile-icon" style="background: rgba(59, 130, 246, 0.08); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.1);"><i class="fas fa-sync-alt"></i></div>
+                <span>Inventory Sync</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="grid grid-2" style="gap: 1.25rem;">
+        <!-- Left Column -->
+        <div>
+            <div class="premium-card">
+                <h3 class="premium-form-title" style="font-size: 1rem; margin-bottom: 1.25rem;"><i class="fas fa-exclamation-triangle text-warning"></i> Stock Alerts</h3>
+                <div class="table-container">
+                    <table class="table" style="font-size: 0.82rem;">
+                        {% for item in low_stock_list %}
+                        <tr>
+                            <td style="padding: 0.75rem 1rem;">
+                                <div style="font-weight: 700;">{{ item.name }}</div>
+                                <code style="font-size: 0.6rem;">{{ item.sku }}</code>
+                            </td>
+                            <td class="text-right" style="padding: 0.75rem 1rem;">
+                                <span class="badge badge-{% if item.status in ['OUT', 'CRITICAL'] %}danger{% else %}warning{% endif %}" style="font-size: 0.65rem;">
+                                    {{ item.qty }} {{ item.unit }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td class="text-muted text-center" style="padding: 1rem;">No alerts.</td></tr>
+                        {% endfor %}
+                    </table>
+                </div>
+            </div>
+
+            <div class="premium-card">
+                <h3 class="premium-form-title" style="font-size: 1rem; margin-bottom: 1.25rem;"><i class="fas fa-warehouse text-primary"></i> Hub Occupancy</h3>
+                {% for wh in warehouse_capacities %}
+                <div style="margin-bottom: 1rem;">
+                    <div class="d-flex justify-content-between" style="font-size: 0.8rem; font-weight: 700; margin-bottom: 4px;">
+                        <span>{{ wh.name }}</span>
+                        <span style="color: var(--primary-color);">{{ wh.pct }}%</span>
+                    </div>
+                    <div style="height: 5px; background: var(--gray-100); border-radius: 10px; overflow: hidden;">
+                        <div style="width: {{ wh.pct }}%; height: 100%; background: var(--accent-gradient); border-radius: 10px;"></div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Right Column -->
+        <div>
+            <div class="premium-card">
+                <div class="d-flex justify-content-between align-items-center" style="margin-bottom: 1.25rem;">
+                    <h3 class="premium-form-title" style="font-size: 1rem; margin: 0;"><i class="fas fa-history text-muted"></i> Recent Log</h3>
+                    <a href="{{ url_for('operations') }}" class="badge badge-info" style="text-decoration: none; font-size: 0.6rem;">View All</a>
+                </div>
+                <div class="table-container">
+                    <table class="table" style="font-size: 0.82rem;">
                         <thead>
-                            <tr style="border-bottom:2px solid var(--gray-100);">
-                                <th style="padding:0.75rem 0.5rem; color:var(--gray-600); font-size:0.75rem; font-weight:700; text-transform:uppercase;">Time</th>
-                                <th style="padding:0.75rem 0.5rem; color:var(--gray-600); font-size:0.75rem; font-weight:700; text-transform:uppercase;">Type</th>
-                                <th style="padding:0.75rem 0.5rem; color:var(--gray-600); font-size:0.75rem; font-weight:700; text-transform:uppercase;">Product</th>
-                                <th style="padding:0.75rem 0.5rem; color:var(--gray-600); font-size:0.75rem; font-weight:700; text-transform:uppercase;">Qty</th>
-                                <th style="padding:0.75rem 0.5rem; color:var(--gray-600); font-size:0.75rem; font-weight:700; text-transform:uppercase;">By</th>
+                            <tr>
+                                <th style="padding: 0.75rem 1rem; font-size: 0.65rem;">Type</th>
+                                <th style="padding: 0.75rem 1rem; font-size: 0.65rem;">Link</th>
+                                <th class="text-right" style="padding: 0.75rem 1rem; font-size: 0.65rem;">User</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for op in recent_operations %}
-                            <tr style="border-bottom:1px solid var(--gray-100);">
-                                <td style="padding:0.75rem 0.5rem; font-size:0.8rem; color:var(--gray-600);">
-                                    {{ op.timestamp.strftime('%H:%M') }}
+                            <tr>
+                                <td style="padding: 0.75rem 1rem;">
+                                    <span class="badge badge-{% if op.type == 'Receipt' %}success{% elif op.type == 'Delivery' %}danger{% elif op.type == 'Transfer' %}warning{% else %}info{% endif %}" style="font-size: 0.6rem; padding: 2px 6px;">
+                                        {{ op.type[0:3] }}
+                                    </span>
                                 </td>
-                                <td style="padding:0.75rem 0.5rem;">
-                                    {% if op.type == 'Receipt' %}
-                                        <span class="badge badge-success" style="font-size:0.65rem;">Receipt</span>
-                                    {% elif op.type == 'Delivery' %}
-                                        <span class="badge badge-danger" style="font-size:0.65rem;">Delivery</span>
-                                    {% elif op.type == 'Transfer' %}
-                                        <span class="badge badge-warning" style="font-size:0.65rem;">Transfer</span>
-                                    {% else %}
-                                        <span class="badge badge-info" style="font-size:0.65rem;">Adjustment</span>
-                                    {% endif %}
+                                <td style="padding: 0.75rem 1rem;">
+                                    <div style="font-weight: 600;">
+                                        {% if op.movements %}
+                                            {{ op.movements[0].product.name[:12] }}...
+                                        {% else %}
+                                            Task #{{ op.id }}
+                                        {% endif %}
+                                    </div>
+                                    <div class="text-muted" style="font-size: 0.6rem;">{{ op.timestamp.strftime('%H:%M %p') }}</div>
                                 </td>
-                                <td style="padding:0.75rem 0.5rem; font-size:0.82rem; color:var(--gray-800);">
-                                    {% if op.movements %}
-                                        {{ op.movements[0].product.name[:20] }}
-                                    {% else %}—{% endif %}
-                                </td>
-                                <td style="padding:0.75rem 0.5rem; font-size:0.82rem; font-weight:700; color:var(--gray-900);">
-                                    {% if op.movements %}
-                                        {{ op.movements[0].quantity }}
-                                    {% else %}—{% endif %}
-                                </td>
-                                <td style="padding:0.75rem 0.5rem; font-size:0.8rem; color:var(--gray-600); font-style:italic;">
-                                    {{ op.user.username }}
-                                </td>
+                                <td class="text-right" style="padding: 0.75rem 1rem;"><span class="badge" style="font-size: 0.55rem; background: var(--gray-100); color: var(--gray-700);">{{ op.user.username }}</span></td>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
-            {% else %}
-                <p class="text-muted" style="font-size:0.85rem; margin-top:1rem;">
-                    No operations recorded yet.
-                </p>
-            {% endif %}
+            </div>
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
 {% endblock %}

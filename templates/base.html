@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}IMS Dashboard{% endblock %}</title>
+    <title>{% block title %}Inventory Tracker{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -17,7 +17,7 @@
                 <div class="logo-icon">
                     <i class="fas fa-gem"></i>
                 </div>
-                <span>IMS Dashboard</span>
+                <span>Inventory Tracker</span>
             </a>
             <ul class="navbar-nav luxury-nav">
                 {% if current_user.is_authenticated %}
@@ -62,10 +62,75 @@
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ category }}">
-                        {{ message }}
+                <div class="popup-overlay" onclick="this.style.opacity='0'; setTimeout(()=>this.remove(),400)">
+                    <div class="popup-box" onclick="event.stopPropagation()">
+                        <div class="popup-accent popup-accent-{{ category }}"></div>
+                        <div class="popup-icon popup-icon-{{ category }}">
+                            {% if category == 'success' %}
+                                <i class="fas fa-check-circle"></i>
+                            {% elif category == 'danger' %}
+                                <i class="fas fa-times-circle"></i>
+                            {% elif category == 'warning' %}
+                                <i class="fas fa-exclamation-triangle"></i>
+                            {% else %}
+                                <i class="fas fa-info-circle"></i>
+                            {% endif %}
+                        </div>
+                        <div class="popup-message">{{ message }}</div>
+                        <button class="popup-close" onclick="this.closest('.popup-overlay').style.opacity='0'; setTimeout(()=>this.closest('.popup-overlay').remove(),400)">&times;</button>
                     </div>
+                </div>
                 {% endfor %}
+
+                <style>
+                    .popup-overlay {
+                        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                        background: rgba(0,0,0,0.45); backdrop-filter: blur(4px);
+                        display: flex; align-items: center; justify-content: center;
+                        z-index: 99999; animation: popIn 0.3s ease; transition: opacity 0.4s;
+                    }
+                    .popup-box {
+                        background: #fff; border-radius: 1.25rem; padding: 2.5rem 3rem;
+                        min-width: 340px; max-width: 440px; text-align: center;
+                        box-shadow: 0 25px 60px rgba(0,0,0,0.25); position: relative;
+                        overflow: hidden; animation: popScale 0.35s ease;
+                    }
+                    .popup-accent {
+                        position: absolute; top: 0; left: 0; right: 0; height: 5px;
+                    }
+                    .popup-accent-success { background: linear-gradient(90deg, #f472b6, #db2777); } /* Rose */
+                    .popup-accent-danger { background: linear-gradient(90deg, #ef4444, #dc2626); }  /* Crimson */
+                    .popup-accent-warning { background: linear-gradient(90deg, #fbbf24, #d97706); } /* Gold */
+                    .popup-accent-info { background: linear-gradient(90deg, #f87171, #991b1b); }    /* Rosewood */
+                    .popup-icon {
+                        font-size: 3rem; margin-bottom: 1rem;
+                    }
+                    .popup-icon-success { color: #db2777; }
+                    .popup-icon-danger { color: #ef4444; }
+                    .popup-icon-warning { color: #d97706; }
+                    .popup-icon-info { color: #991b1b; }
+                    .popup-message {
+                        font-size: 1.6rem; font-weight: 700; color: #1e293b;
+                        line-height: 1.4;
+                    }
+                    .popup-close {
+                        position: absolute; top: 12px; right: 16px; background: none;
+                        border: none; font-size: 1.5rem; color: #94a3b8; cursor: pointer;
+                        transition: color 0.2s;
+                    }
+                    .popup-close:hover { color: #1e293b; }
+                    @keyframes popIn { from { opacity: 0; } to { opacity: 1; } }
+                    @keyframes popScale { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+                </style>
+
+                <script>
+                    setTimeout(function() {
+                        document.querySelectorAll('.popup-overlay').forEach(function(el) {
+                            el.style.opacity = '0';
+                            setTimeout(function() { el.remove(); }, 400);
+                        });
+                    }, 3000);
+                </script>
             {% endif %}
         {% endwith %}
 

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - CoreInventory System</title>
+    <title>Login - Inventory Tracker System</title>
     <!-- Google Fonts Inter -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Font Awesome 6 -->
@@ -430,13 +430,13 @@
     <div class="login-wrapper">
         <!-- LEFT PANEL -->
         <div class="left-panel">
-            <div class="brand-section">
-                <div class="logo-box">
+            <div class="brand-row">
+                <div class="brand-icon">
                     <i class="fas fa-gem"></i>
                 </div>
                 <div class="brand-text-wrap">
-                    <span class="brand-name">CoreInventory</span>
-                    <span class="brand-sub">CoreInventory System</span>
+                    <span class="brand-label">Inventory Tracker</span>
+                    <span class="brand-sub">Inventory Tracker System</span>
                 </div>
             </div>
 
@@ -445,9 +445,7 @@
                     Your inventory,<br>
                     <span class="highlight">fully in control.</span>
                 </h1>
-                <p class="main-subtitle">
-                    Real-time stock tracking, operations management and analytics — built for modern warehouses.
-                </p>
+
 
                 <div class="features-grid">
                     <div class="feat-card">
@@ -470,21 +468,21 @@
             </div>
 
             <div class="left-footer">
-                CoreInventory &copy; 2026 | Hackathon Project
+                Inventory Tracker &copy; 2026
             </div>
         </div>
 
         <!-- RIGHT PANEL -->
         <div class="right-panel">
-            <div class="form-header">
-                <h2 class="form-title">Welcome back</h2>
-                <p class="form-subtitle">Sign in to your account to continue</p>
+            <div class="premium-form-header">
+                <h2 class="premium-form-title">Welcome back</h2>
+                <p class="premium-form-subtitle">Sign in to your account to continue</p>
             </div>
 
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     {% for category, message in messages %}
-                        <div class="flash-msg flash-{{ category }}">
+                        <div class="alert alert-{{ category }}">
                             <i class="fas fa-info-circle"></i> {{ message }}
                         </div>
                     {% endfor %}
@@ -495,52 +493,52 @@
                 {{ form.hidden_tag() }}
                 
                 <!-- Email Field -->
-                <div class="field">
-                    <label class="field-label">
+                <div class="premium-field">
+                    <label class="premium-field-label">
                         <div class="label-icon"><i class="fas fa-envelope"></i></div>
                         Email Address
                     </label>
                     {% if form.email.errors %}
-                        {{ form.email(class="field-input is-invalid", placeholder="you@example.com") }}
+                        {{ form.email(class="form-control is-invalid", placeholder="you@example.com") }}
                         <div class="invalid-feedback">
                             {% for error in form.email.errors %}
                                 <span>{{ error }}</span>
                             {% endfor %}
                         </div>
                     {% else %}
-                        {{ form.email(class="field-input", placeholder="you@example.com") }}
+                        {{ form.email(class="form-control", placeholder="you@example.com") }}
                     {% endif %}
                 </div>
 
                 <!-- Password Field -->
-                <div class="field">
-                    <label class="field-label">
+                <div class="premium-field">
+                    <label class="premium-field-label">
                         <div class="label-icon"><i class="fas fa-lock"></i></div>
                         Password
                     </label>
                     {% if form.password.errors %}
-                        {{ form.password(class="field-input is-invalid", placeholder="Enter your password") }}
+                        {{ form.password(class="form-control is-invalid", placeholder="Enter your password") }}
                         <div class="invalid-feedback">
                             {% for error in form.password.errors %}
                                 <span>{{ error }}</span>
                             {% endfor %}
                         </div>
                     {% else %}
-                        {{ form.password(class="field-input", placeholder="Enter your password") }}
+                        {{ form.password(class="form-control", placeholder="Enter your password") }}
                     {% endif %}
                     <a href="{{ url_for('forgot_password') }}" class="forgot-link">
                         Forgot Password?
                     </a>
                 </div>
 
-                <button type="submit" class="btn-login">
+                <button type="submit" class="btn-premium">
                     <i class="fas fa-sign-in-alt"></i> Sign In to Dashboard
                 </button>
             </form>
 
             <div class="divider">or</div>
 
-            <div class="signup-row">
+            <div class="auth-footer-row">
                 Don't have an account? 
                 <a href="{{ url_for('signup') }}">Create one now</a>
             </div>
@@ -548,3 +546,4 @@
     </div>
 </body>
 </html>
+```

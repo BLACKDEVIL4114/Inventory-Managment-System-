@@ -3,73 +3,70 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Error - Inventory Management System</title>
+    <title>System Error - IMS Premium</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/all.min.css">
     <style>
+        :root {
+            --primary-color: #dc2626;
+            --accent-gradient: linear-gradient(135deg, #dc2626 0%, #9d174d 100%);
+            --gray-900: #111827;
+            --gray-600: #4b5563;
+        }
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Inter', sans-serif;
+            background: #fdf3f4;
             margin: 0;
-            padding: 0;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
+            height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
         }
-        .error-container {
-            background: white;
-            padding: 40px;
-            border-radius: 10px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        .error-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            padding: 3rem;
+            border-radius: 24px;
+            border: 1px solid rgba(220, 38, 38, 0.1);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
             text-align: center;
-            max-width: 500px;
+            max-width: 450px;
             width: 90%;
+            animation: slideUp 0.6s ease-out;
         }
-        .error-icon {
-            font-size: 64px;
-            color: #e74c3c;
-            margin-bottom: 20px;
-        }
-        .error-title {
-            color: #2c3e50;
-            font-size: 24px;
-            margin-bottom: 15px;
-        }
-        .error-message {
-            color: #7f8c8d;
-            margin-bottom: 30px;
-            line-height: 1.6;
-        }
-        .back-button {
-            background: #3498db;
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .error-brand {
+            width: 60px; height: 60px;
+            background: var(--accent-gradient);
             color: white;
-            padding: 12px 24px;
-            border: none;
-            border-radius: 5px;
+            border-radius: 16px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.5rem;
+            margin: 0 auto 1.5rem;
+            box-shadow: 0 10px 15px -3px rgba(220, 38, 38, 0.3);
+        }
+        .error-title { font-weight: 800; font-size: 1.5rem; color: var(--gray-900); margin-bottom: 0.75rem; }
+        .error-msg { color: var(--gray-600); font-size: 0.95rem; line-height: 1.6; margin-bottom: 2rem; padding: 1rem; background: rgba(0,0,0,0.03); border-radius: 12px; }
+        .btn-premium {
+            background: var(--accent-gradient);
+            color: white;
+            padding: 0.8rem 2rem;
+            border-radius: 12px;
             text-decoration: none;
+            font-weight: 700;
             display: inline-block;
-            transition: background 0.3s;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            transition: all 0.3s;
         }
-        .back-button:hover {
-            background: #2980b9;
-        }
-        .home-link {
-            color: #3498db;
-            text-decoration: none;
-            margin-top: 20px;
-            display: block;
-        }
-        .home-link:hover {
-            text-decoration: underline;
-        }
+        .btn-premium:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(220, 38, 38, 0.2); }
     </style>
 </head>
 <body>
-    <div class="error-container">
-        <div class="error-icon">⚠️</div>
-        <h1 class="error-title">Oops! Something went wrong</h1>
-        <p class="error-message">{{ error }}</p>
-        <a href="/" class="back-button">Go Back Home</a>
-        <a href="/" class="home-link">Return to Dashboard</a>
+    <div class="error-card">
+        <div class="error-brand"><i class="fas fa-exclamation-triangle"></i></div>
+        <h1 class="error-title">Connection Interrupted</h1>
+        <p class="error-msg">{{ error }}</p>
+        <a href="/" class="btn-premium">Return to Dashboard</a>
     </div>
 </body>
-</html>
+</html>

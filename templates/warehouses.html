@@ -1,49 +1,52 @@
 {% extends "base.html" %}
-{% block title %}Warehouses - IMS Dashboard{% endblock %}
+{% block title %}Warehouses - Inventory Tracker{% endblock %}
 {% block content %}
-<div class="card mb-6">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <div>
-            <h1 class="card-title">
-                <i class="fas fa-warehouse text-primary"></i>
-                Warehouse Management
-            </h1>
-            <p class="card-subtitle">
-                Manage your storage locations.
-            </p>
-        </div>
-        {% if current_user.role == 'manager' %}
-            <a href="{{ url_for('new_warehouse') }}" class="btn btn-primary">
-                <i class="fas fa-plus"></i> New Warehouse
-            </a>
-        {% endif %}
+<div class="premium-card">
+    <div class="brand-row">
+        <div class="brand-icon"><i class="fas fa-warehouse"></i></div>
+        <span class="brand-label">Storage Hubs</span>
     </div>
-</div>
 
-<div class="card">
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Name</th>
-                        <th>Location</th>
-                        <th>Stock Items</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for w in warehouses %}
-                        <tr>
-                            <td>{{ w.id }}</td>
-                            <td>{{ w.name }}</td>
-                            <td>{{ w.location }}</td>
-                            <td>{{ w.stocks|length }} items</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    <div class="premium-form-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h2 class="premium-form-title">Warehouse Management</h2>
+            </div>
+            {% if current_user.role == 'manager' %}
+                <a href="{{ url_for('new_warehouse') }}" class="btn-premium" style="width: auto; padding: 0.75rem 1.5rem;">
+                    <i class="fas fa-plus"></i> Add Warehouse
+                </a>
+            {% endif %}
         </div>
+    </div>
+
+    <div class="table-container" style="margin-top: 2rem;">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th style="width: 80px;">ID</th>
+                    <th>Warehouse Name</th>
+                    <th>Location Details</th>
+                    <th style="text-align: right;">Inventory Count</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for w in warehouses %}
+                    <tr>
+                        <td><code>#{{ w.id }}</code></td>
+                        <td style="font-weight: 700; font-size: 1.1rem; color: var(--primary-dark);">{{ w.name }}</td>
+                        <td>
+                            <span class="text-muted"><i class="fas fa-map-marker-alt" style="margin-right: 5px;"></i> {{ w.location or 'No location details' }}</span>
+                        </td>
+                        <td style="text-align: right;">
+                            <a href="{{ url_for('warehouse_detail', warehouse_id=w.id) }}" class="badge-link">
+                                <span class="badge badge-info">{{ w.stocks|length }} items</span>
+                            </a>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
 {% endblock %}

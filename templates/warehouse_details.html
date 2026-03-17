@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Warehouse: {{ warehouse.name }} - Inventory Tracker{% endblock %}
+{% block content %}
+<div class="premium-card">
+    <div class="brand-row">
+        <div class="brand-icon"><i class="fas fa-warehouse"></i></div>
+        <span class="brand-label">Warehouse Inventory</span>
+    </div>
+
+    <div class="premium-form-header" style="margin-bottom: 1.5rem;">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h2 class="premium-form-title">{{ warehouse.name }}</h2>
+                <div class="text-muted" style="font-size: 0.9rem; margin-top: 0.25rem;">
+                    <i class="fas fa-map-marker-alt"></i> {{ warehouse.location or 'No location details' }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <a href="{{ url_for('warehouses') }}" class="btn-premium" style="display: block; width: 100%; text-decoration: none; margin-bottom: 2rem; padding: 1rem;">
+        <i class="fas fa-arrow-left"></i> Back to Hubs
+    </a>
+
+    <div class="table-container" style="margin-top: 2rem;">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>SKU</th>
+                    <th>Product Name</th>
+                    <th>Category</th>
+                    <th style="text-align: right;">Quantity</th>
+                    <th>Unit</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if warehouse.stocks %}
+                    {% for stock in warehouse.stocks %}
+                        <tr>
+                            <td><code>{{ stock.product.sku }}</code></td>
+                            <td style="font-weight: 700;">{{ stock.product.name }}</td>
+                            <td><span class="text-muted">{{ stock.product.category or 'Uncategorized' }}</span></td>
+                            <td style="text-align: right; font-weight: 800; font-size: 1.1rem; color: var(--primary-dark);">
+                                {{ stock.quantity }}
+                            </td>
+                            <td>{{ stock.product.unit }}</td>
+                            <td>
+                                {% if stock.quantity == 0 %}
+                                    <span class="badge badge-danger">Out</span>
+                                {% elif stock.quantity <= stock.product.min_stock_level %}
+                                    <span class="badge badge-warning">Low</span>
+                                {% else %}
+                                    <span class="badge badge-success">Good</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center py-8">
+                            <div class="text-muted">
+                                <i class="fas fa-box-open fa-3x mb-4 d-block" style="opacity: 0.2;"></i>
+                                This warehouse is currently empty.
+                            </div>
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

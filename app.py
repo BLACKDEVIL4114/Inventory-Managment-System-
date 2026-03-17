@@ -22,7 +22,9 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
 app.config['SESSION_COOKIE_SECURE'] = False  # Set to True only when using HTTPS
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///inventory.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///inventory.db')
+if app.config['SQLALCHEMY_DATABASE_URI'].startswith("postgres://"):
+    app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace("postgres://", "postgresql://", 1)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'data_set'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
@@ -345,7 +347,7 @@ def login():
         user = User.query.filter_by(email=form.email.data).first()
         if user and user.check_password(form.password.data):
             login_user(user)
-            flash('You have been logged in!', 'success')
+            flash(f'Welcome, {user.username}!', 'success')
             from urllib.parse import urlparse
             next_page = request.args.get('next')
             if next_page and (urlparse(next_page).netloc or urlparse(next_page).scheme):
@@ -501,12 +503,15 @@ def dashboard():
         Operation.timestamp.desc()).limit(5).all()
 
     # ── Step 2: Try to get business metrics from CSV ─────────
-    total_revenue      = 0
-    health_score       = 0
-    growth_trend       = '—'
-    growth_is_positive = True
-    csv_products_count = 0
+    total_revenue          = 0
+    health_score           = 0
+    growth_trend           = '—'
+    growth_is_positive     = True
+    csv_products_count     = 0
     internal_transfers_csv = 0
+    sales_trend_labels    = []
+    sales_trend_delivered = []
+    sales_trend_received  = []
 
     transaction_csv_path = os.path.join(
         app.config['UPLOAD_FOLDER'], 'inventory_demo_dataset.csv')
@@ -520,6 +525,11 @@ def dashboard():
         growth_is_positive     = csv_data.get('growth_is_positive', True)
         csv_products_count     = csv_data.get('total_products', 0)
         internal_transfers_csv = csv_data.get('internal_transfers', 0)
+        
+        # Extract chart data
+        sales_trend_labels    = csv_data.get('sales_trend_labels', [])
+        sales_trend_delivered = csv_data.get('sales_trend_delivered', [])
+        sales_trend_received  = csv_data.get('sales_trend_received', [])
 
     # ── Step 3: Use best value for each KPI ─────────────────
     # Total products: DB if has data, else CSV count
@@ -543,9 +553,13 @@ def dashboard():
         health_score         = health_score,
         growth_trend         = growth_trend,
         growth_is_positive   = growth_is_positive,
+        sales_trend_labels   = sales_trend_labels,
+        sales_trend_delivered = sales_trend_delivered,
+        sales_trend_received = sales_trend_received,
         low_stock_list       = low_stock_list[:5],
         warehouse_capacities = warehouse_capacities,
         recent_operations    = recent_operations,
+        smart_insights       = csv_data.get('smart_insights', []) if transaction_df is not None else [],
         dashboard_source     = 'live')
 
 @app.route("/staff_panel")
@@ -641,12 +655,12 @@ def products():
         p.total_stock = sum(s.quantity for s in p.stocks)
         p.stock_by_warehouse = []
         for s in p.stocks:
-            if s.quantity > 0:
-                p.stock_by_warehouse.append({
-                    'warehouse': s.warehouse.name,
-                    'qty': s.quantity,
-                    'unit': p.unit
-                })
+            p.stock_by_warehouse.append({
+                'warehouse': s.warehouse.name,
+                'location': s.warehouse.location,
+                'qty': s.quantity,
+                'unit': p.unit
+            })
     return render_template('products.html', products=all_products)
 
 @app.route("/product/new", methods=['GET', 'POST'])
@@ -656,14 +670,34 @@ def new_product():
         flash('Only managers can add products.', 'danger')
         return redirect(url_for('products'))
     form = ProductForm()
+    # Populate warehouse choices
+    warehouses = Warehouse.query.all()
+    form.warehouse_id.choices = [(0, '-- No initial warehouse --')] + [(w.id, w.name) for w in warehouses]
+
     if form.validate_on_submit():
-        product = Product(name=form.name.data, sku=form.sku.data, 
-                         category=form.category.data, unit=form.unit.data,
-                         min_stock_level=form.min_stock_level.data)
-        db.session.add(product)
-        db.session.commit()
-        flash('Product created successfully!', 'success')
-        return redirect(url_for('products'))
+        # Check if SKU already exists
+        existing = Product.query.filter_by(sku=form.sku.data).first()
+        if existing:
+            flash(f'A product with SKU "{form.sku.data}" already exists. Please use a unique SKU.', 'danger')
+            return render_template('edit_product.html', title='New Product', form=form)
+        try:
+            product = Product(name=form.name.data, sku=form.sku.data, 
+                             category=form.category.data, unit=form.unit.data,
+                             min_stock_level=form.min_stock_level.data)
+            db.session.add(product)
+            db.session.flush() # Get product ID before commit
+
+            # Create initial stock entry if a warehouse was selected
+            if form.warehouse_id.data and form.warehouse_id.data != 0:
+                initial_stock = Stock(product_id=product.id, warehouse_id=form.warehouse_id.data, quantity=0)
+                db.session.add(initial_stock)
+
+            db.session.commit()
+            flash('Product created successfully!', 'success')
+            return redirect(url_for('products'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'An error occurred: {str(e)}', 'danger')
     return render_template('edit_product.html', title='New Product', form=form)
 
 @app.route("/product/edit/<int:product_id>", methods=['GET', 'POST'])
@@ -674,12 +708,22 @@ def edit_product(product_id):
         return redirect(url_for('products'))
     product = Product.query.get_or_404(product_id)
     form = ProductForm()
+    # Populate warehouse choices
+    warehouses = Warehouse.query.all()
+    form.warehouse_id.choices = [(0, '-- No change --')] + [(w.id, w.name) for w in warehouses]
+
     if form.validate_on_submit():
         product.name = form.name.data
         product.sku = form.sku.data
         product.category = form.category.data
         product.unit = form.unit.data
         product.min_stock_level = form.min_stock_level.data
+        
+        # Optionally handle warehouse update if needed, but usually products can be in multiple warehouses.
+        # User requested to see existed warehouse when ADDING product. 
+        # For editing, we might just show options but usually stock is managed via operations.
+        # However, for consistency we populate it.
+        
         db.session.commit()
         flash('Product updated successfully!', 'success')
         return redirect(url_for('products'))
@@ -700,6 +744,17 @@ def warehouses():
         return redirect(url_for('staff_panel'))
     all_warehouses = Warehouse.query.all()
     return render_template('warehouses.html', warehouses=all_warehouses)
+
+@app.route("/warehouse/<int:warehouse_id>")
+@login_required
+def warehouse_detail(warehouse_id):
+    if current_user.role == 'staff':
+        return redirect(url_for('staff_panel'))
+    warehouse = Warehouse.query.get_or_404(warehouse_id)
+    # Get all stocks for this warehouse where quantity is > 0
+    # Actually user might want to see all associated products, but >0 is more practical.
+    # I'll show all and highlight those with 0.
+    return render_template('warehouse_details.html', warehouse=warehouse)
 
 @app.route("/warehouse/new", methods=['GET', 'POST'])
 @login_required
@@ -921,6 +976,21 @@ def init_db():
             db.session.add_all([w1, w2, w3])
             db.session.commit()
 
-if __name__ == '__main__':
+# Initialize database on app startup
+try:
     init_db()
-    app.run(debug=False, host='127.0.0.1', port=5000)
+except Exception as e:
+    print(f"Database initialization failed: {e}")
+
+if __name__ == '__main__':
+    import os as _os
+    # Use 'stat' reloader instead of 'watchdog' to prevent the reloader from
+    # monitoring site-packages (SQLAlchemy etc.), which causes ERR_CONNECTION_RESET
+    # on Windows when watchdog detects filesystem access as "changes".
+    app.run(debug=True, host='0.0.0.0', port=5000,
+            use_reloader=True,
+            reloader_type='stat',
+            extra_files=[
+                _os.path.join(_os.path.dirname(__file__), 'templates'),
+                _os.path.join(_os.path.dirname(__file__), 'static'),
+            ])

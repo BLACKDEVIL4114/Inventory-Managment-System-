@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}My Profile – IMS Dashboard{% endblock %}
+{% block title %}My Profile – Inventory Tracker{% endblock %}
 
 {% block head %}
 <style>
@@ -37,162 +37,104 @@
 {% endblock %}
 
 {% block content %}
-
-<!-- Page header -->
-<div class="card mb-6" style="background:var(--white);box-shadow:var(--shadow);border-radius:var(--border-radius-lg);padding:1.5rem 2rem;">
-  <div class="d-flex justify-content-between align-items-center">
-    <div>
-      <h1 class="card-title" style="font-size:1.5rem;font-weight:800;color:var(--gray-900);display:flex;align-items:center;gap:0.6rem;">
-        <i class="fas fa-user-circle" style="color:var(--primary-color)"></i> My Profile
-      </h1>
-      <p class="card-subtitle" style="color:var(--gray-600);font-size:0.88rem;margin-top:0.3rem;">
-        View and update your account information
-      </p>
-    </div>
-    {% if current_user.role == 'manager' %}
-      <a href="{{ url_for('dashboard') }}" class="btn btn-outline">
-        <i class="fas fa-arrow-left"></i> Back to Dashboard
-      </a>
-    {% else %}
-      <a href="{{ url_for('staff_panel') }}" class="btn btn-outline">
-        <i class="fas fa-arrow-left"></i> Back to Staff Panel
-      </a>
-    {% endif %}
-  </div>
-</div>
-
-<div class="grid grid-2" style="gap:1.5rem;align-items:start;">
-
-  <!-- Left column: avatar + stats -->
-  <div style="display:flex;flex-direction:column;gap:1rem;">
-
-    <!-- Avatar card -->
-    <div class="card" style="background:var(--white);box-shadow:var(--shadow);border-radius:var(--border-radius-lg);padding:2rem 1.5rem;text-align:center;">
-      <div class="profile-avatar-circle">
-        {{ current_user.username[0]|upper }}
-      </div>
-      <h2 style="font-size:1.2rem;font-weight:800;color:var(--gray-900);margin-bottom:0.3rem;">
-        {{ current_user.username }}
-      </h2>
-      <p style="color:var(--gray-600);font-size:0.85rem;margin-bottom:0.9rem;">
-        {{ current_user.email }}
-      </p>
-      <div>
-        <span class="role-badge">
-          {% if current_user.role == 'manager' %}
-            <i class="fas fa-crown"></i> Inventory Manager
-          {% else %}
-            <i class="fas fa-user-tie"></i> Warehouse Staff
-          {% endif %}
-        </span>
-      </div>
-      <p class="password-hint" style="margin-top:1rem;">
-        <i class="fas fa-info-circle"></i> Role cannot be changed from this page.
-      </p>
-    </div>
-
-    <!-- Stats cards -->
-    <div class="grid grid-2" style="gap:0.75rem;">
-      <div class="profile-stat-card">
-        <div class="pstat-label">Total Operations</div>
-        <div class="pstat-value">{{ total_operations }}</div>
-        <div class="pstat-sub">performed by you</div>
-      </div>
-      <div class="profile-stat-card">
-        <div class="pstat-label">Your Role</div>
-        <div class="pstat-value" style="font-size:1.1rem;text-transform:capitalize;">
-          {{ current_user.role }}
+<div class="main-container">
+    <!-- Header Section -->
+    <div class="premium-card">
+        <div class="brand-row">
+            <div class="brand-icon"><i class="fas fa-user-circle"></i></div>
+            <span class="brand-label">Account Identity</span>
         </div>
-        <div class="pstat-sub">account type</div>
-      </div>
+        <div class="premium-form-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="premium-form-title">Pro User Profile</h2>
+                    <p class="premium-form-subtitle">Manage your personal information and security settings.</p>
+                </div>
+                <div class="text-right">
+                    {% if current_user.role == 'manager' %}
+                        <a href="{{ url_for('dashboard') }}" class="badge badge-info" style="text-decoration: none;"><i class="fas fa-arrow-left"></i> Home</a>
+                    {% else %}
+                        <a href="{{ url_for('staff_panel') }}" class="badge badge-info" style="text-decoration: none;"><i class="fas fa-arrow-left"></i> Home</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
     </div>
 
-  </div>
+    <div class="grid grid-3" style="grid-template-columns: 1fr 2fr; gap: 2rem;">
+        <!-- Left: Identity Card -->
+        <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+            <div class="premium-card" style="text-align: center; padding: 2.5rem 1.5rem;">
+                <div class="profile-avatar-circle" style="width: 100px; height: 100px; border-radius: 50%; background: var(--accent-gradient); color: white; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; font-weight: 800; margin: 0 auto 1.5rem; box-shadow: var(--shadow-lg);">
+                    {{ current_user.username[0]|upper }}
+                </div>
+                <h3 style="font-weight: 800; color: var(--gray-900); font-size: 1.25rem; margin-bottom: 0.5rem;">{{ current_user.username }}</h3>
+                <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 1.5rem;">{{ current_user.email }}</p>
+                <div class="badge badge-info" style="font-size: 0.75rem; padding: 0.5rem 1rem; border-radius: 20px;">
+                    <i class="fas fa-shield-alt"></i> {{ current_user.role|upper }}
+                </div>
+            </div>
 
-  <!-- Right column: edit form -->
-  <div class="card" style="background:var(--white);box-shadow:var(--shadow);border-radius:var(--border-radius-lg);padding:2rem;">
+            <div class="grid grid-2" style="gap: 1rem;">
+                <div class="stats-card" style="text-align: center;">
+                    <div class="summary-title">Ops Done</div>
+                    <div class="stats-number" style="font-size: 1.5rem;">{{ total_operations }}</div>
+                </div>
+                <div class="stats-card" style="text-align: center;">
+                    <div class="summary-title">Verified</div>
+                    <div class="stats-number" style="font-size: 1.5rem;"><i class="fas fa-check-circle text-success"></i></div>
+                </div>
+            </div>
+        </div>
 
-    <h3 style="font-size:1rem;font-weight:700;color:var(--gray-800);margin-bottom:1.5rem;display:flex;align-items:center;gap:0.5rem;">
-      <i class="fas fa-edit" style="color:var(--primary-color)"></i> Edit Information
-    </h3>
+        <!-- Right: Edit Form -->
+        <div class="premium-card" style="padding: 2.5rem;">
+            <div class="brand-row" style="margin-bottom: 1.5rem;">
+                <div class="brand-icon" style="background: var(--gray-100); color: var(--gray-700);"><i class="fas fa-edit"></i></div>
+                <span class="brand-label">Personal Details</span>
+            </div>
 
-    <form method="POST" action="{{ url_for('profile') }}">
-      {{ form.hidden_tag() }}
+            <form method="POST" action="{{ url_for('profile') }}">
+                {{ form.hidden_tag() }}
 
-      <!-- Username -->
-      <div class="form-group mb-3">
-        {{ form.username.label(class="form-label") }}
-        {% if form.username.errors %}
-          {{ form.username(class="form-control is-invalid") }}
-          <div class="invalid-feedback">
-            {% for error in form.username.errors %}<span>{{ error }}</span>{% endfor %}
-          </div>
-        {% else %}
-          {{ form.username(class="form-control") }}
-        {% endif %}
-      </div>
+                <div class="grid grid-2" style="gap: 1.5rem;">
+                    <div class="premium-field">
+                        <label class="premium-field-label"><div class="label-icon"><i class="fas fa-user"></i></div> Username</label>
+                        {{ form.username(class="form-control") }}
+                    </div>
+                    <div class="premium-field">
+                        <label class="premium-field-label"><div class="label-icon"><i class="fas fa-envelope"></i></div> Email</label>
+                        {{ form.email(class="form-control") }}
+                    </div>
+                </div>
 
-      <!-- Email -->
-      <div class="form-group mb-3">
-        {{ form.email.label(class="form-label") }}
-        {% if form.email.errors %}
-          {{ form.email(class="form-control is-invalid") }}
-          <div class="invalid-feedback">
-            {% for error in form.email.errors %}<span>{{ error }}</span>{% endfor %}
-          </div>
-        {% else %}
-          {{ form.email(class="form-control") }}
-        {% endif %}
-      </div>
+                <div class="divider" style="margin: 2rem 0; border-top: 1px dashed var(--gray-200); position: relative; text-align: center;">
+                    <span style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: white; padding: 0 1rem; font-size: 0.7rem; font-weight: 800; color: var(--gray-500); text-transform: uppercase;">Security Update</span>
+                </div>
 
-      <hr class="section-divider">
+                <div class="grid grid-2" style="gap: 1.5rem;">
+                    <div class="premium-field">
+                        <label class="premium-field-label"><div class="label-icon"><i class="fas fa-key"></i></div> New Password</label>
+                        {{ form.new_password(class="form-control", placeholder="Leave blank to keep current") }}
+                    </div>
+                    <div class="premium-field">
+                        <label class="premium-field-label"><div class="label-icon"><i class="fas fa-lock"></i></div> Confirm Password</label>
+                        {{ form.confirm_password(class="form-control", placeholder="Repeat new password") }}
+                    </div>
+                </div>
 
-      <h4 style="font-size:0.9rem;font-weight:700;color:var(--gray-700);margin-bottom:1rem;display:flex;align-items:center;gap:0.5rem;">
-        <i class="fas fa-lock" style="color:var(--primary-color)"></i> Change Password
-        <span class="badge badge-info" style="font-size:0.7rem;font-weight:600;">Optional</span>
-      </h4>
-
-      <!-- New password -->
-      <div class="form-group mb-3">
-        {{ form.new_password.label(class="form-label") }}
-        {% if form.new_password.errors %}
-          {{ form.new_password(class="form-control is-invalid") }}
-          <div class="invalid-feedback">
-            {% for error in form.new_password.errors %}<span>{{ error }}</span>{% endfor %}
-          </div>
-        {% else %}
-          {{ form.new_password(class="form-control", placeholder="Leave blank to keep current password") }}
-        {% endif %}
-        <p class="password-hint">Minimum 6 characters. Leave blank if you do not want to change your password.</p>
-      </div>
-
-      <!-- Confirm new password -->
-      <div class="form-group mb-3">
-        {{ form.confirm_password.label(class="form-label") }}
-        {% if form.confirm_password.errors %}
-          {{ form.confirm_password(class="form-control is-invalid") }}
-          <div class="invalid-feedback">
-            {% for error in form.confirm_password.errors %}<span>{{ error }}</span>{% endfor %}
-          </div>
-        {% else %}
-          {{ form.confirm_password(class="form-control", placeholder="Repeat new password") }}
-        {% endif %}
-      </div>
-
-      <hr class="section-divider">
-
-      <!-- Submit -->
-      <div class="d-flex" style="gap:0.75rem;align-items:center;">
-        {{ form.submit(class="btn btn-primary") }}
-        {% if current_user.role == 'manager' %}
-          <a href="{{ url_for('dashboard') }}" class="btn btn-outline">Cancel</a>
-        {% else %}
-          <a href="{{ url_for('staff_panel') }}" class="btn btn-outline">Cancel</a>
-        {% endif %}
-      </div>
-
-    </form>
-  </div>
-
+                <div style="margin-top: 2.5rem; display: flex; gap: 1rem;">
+                    <button type="submit" class="btn-premium" style="flex: 2;">
+                        <i class="fas fa-save"></i> Commit Changes
+                    </button>
+                    {% if current_user.role == 'manager' %}
+                        <a href="{{ url_for('dashboard') }}" class="btn-premium" style="flex: 1; background: var(--gray-100); color: var(--gray-600); box-shadow: none;">Cancel</a>
+                    {% else %}
+                        <a href="{{ url_for('staff_panel') }}" class="btn-premium" style="flex: 1; background: var(--gray-100); color: var(--gray-600); box-shadow: none;">Cancel</a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 {% endblock %}

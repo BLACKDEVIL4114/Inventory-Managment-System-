@@ -1,26 +1,79 @@
 {% extends "base.html" %}
-{% block title %}New {{ type }} - IMS Dashboard{% endblock %}
+{% block title %}New {{ type }} - Inventory Tracker{% endblock %}
 {% block content %}
-<div class="card mb-6">
-    <div class="card-header">
-        <h1 class="card-title">
-            <i class="fas fa-plus text-primary"></i>
-            New {{ type }} Operation
-        </h1>
-        <p class="card-subtitle">
-            Create a new stock movement record.
-        </p>
+<div class="main-container" style="max-width: 720px; margin: 0 auto;">
+    <!-- Operation Type Selector Tabs -->
+    <div class="operation-type-tabs" style="display:flex; gap:0.75rem; margin-bottom:2rem; justify-content: center; flex-wrap:wrap;">
+        <a href="{{ url_for('new_operation', op_type='Receipt') }}" 
+           class="op-tab{% if type == 'Receipt' %} op-tab-active{% endif %}" 
+           style="display:inline-flex; align-items:center; gap:0.5rem; padding:0.7rem 1.25rem; border-radius:12px; text-decoration:none; font-weight:700; font-size:0.9rem; transition:all 0.3s ease;
+                  {% if type == 'Receipt' %}background:linear-gradient(135deg,#16a34a,#15803d); color:#fff; box-shadow:0 4px 15px rgba(22,163,74,0.3);{% else %}background:rgba(255,255,255,0.7); color:#475569; border:1px solid rgba(255,255,255,0.4);{% endif %}">
+            <i class="fas fa-arrow-down"></i> Receipt
+        </a>
+        <a href="{{ url_for('new_operation', op_type='Delivery') }}" 
+           class="op-tab{% if type == 'Delivery' %} op-tab-active{% endif %}"
+           style="display:inline-flex; align-items:center; gap:0.5rem; padding:0.7rem 1.25rem; border-radius:12px; text-decoration:none; font-weight:700; font-size:0.9rem; transition:all 0.3s ease;
+                  {% if type == 'Delivery' %}background:linear-gradient(135deg,#dc2626,#991b1b); color:#fff; box-shadow:0 4px 15px rgba(220,38,38,0.3);{% else %}background:rgba(255,255,255,0.7); color:#475569; border:1px solid rgba(255,255,255,0.4);{% endif %}">
+            <i class="fas fa-arrow-up"></i> Delivery
+        </a>
+        <a href="{{ url_for('new_operation', op_type='Transfer') }}" 
+           class="op-tab{% if type == 'Transfer' %} op-tab-active{% endif %}"
+           style="display:inline-flex; align-items:center; gap:0.5rem; padding:0.7rem 1.25rem; border-radius:12px; text-decoration:none; font-weight:700; font-size:0.9rem; transition:all 0.3s ease;
+                  {% if type == 'Transfer' %}background:linear-gradient(135deg,#d97706,#b45309); color:#fff; box-shadow:0 4px 15px rgba(217,119,6,0.3);{% else %}background:rgba(255,255,255,0.7); color:#475569; border:1px solid rgba(255,255,255,0.4);{% endif %}">
+            <i class="fas fa-exchange-alt"></i> Transfer
+        </a>
+        <a href="{{ url_for('new_operation', op_type='Adjustment') }}" 
+           class="op-tab{% if type == 'Adjustment' %} op-tab-active{% endif %}"
+           style="display:inline-flex; align-items:center; gap:0.5rem; padding:0.7rem 1.25rem; border-radius:12px; text-decoration:none; font-weight:700; font-size:0.9rem; transition:all 0.3s ease;
+                  {% if type == 'Adjustment' %}background:linear-gradient(135deg,#0891b2,#0e7490); color:#fff; box-shadow:0 4px 15px rgba(8,145,178,0.3);{% else %}background:rgba(255,255,255,0.7); color:#475569; border:1px solid rgba(255,255,255,0.4);{% endif %}">
+            <i class="fas fa-sliders-h"></i> Adjustment
+        </a>
     </div>
-</div>
 
-<div class="card" style="max-width: 600px; margin: 2rem auto;">
-    <div class="card-body">
+    <div class="premium-card" style="max-width: 100%;">
+        <div class="brand-row">
+            <div class="brand-icon">
+                {% if type == 'Receipt' %}<i class="fas fa-arrow-down"></i>
+                {% elif type == 'Delivery' %}<i class="fas fa-arrow-up"></i>
+                {% elif type == 'Transfer' %}<i class="fas fa-exchange-alt"></i>
+                {% elif type == 'Adjustment' %}<i class="fas fa-sliders-h"></i>
+                {% else %}<i class="fas fa-plus"></i>{% endif %}
+            </div>
+            <span class="brand-label">Stock Operation</span>
+        </div>
+
+        <div class="premium-form-header">
+            <h2 class="premium-form-title">New {{ type }}</h2>
+            <p class="premium-form-subtitle">
+                {% if type == 'Receipt' %}Record incoming stock from a supplier.
+                {% elif type == 'Delivery' %}Record outgoing stock leaving a warehouse.
+                {% elif type == 'Transfer' %}Move stock between two warehouses.
+                {% elif type == 'Adjustment' %}Correct stock levels manually.
+                {% else %}Create a new stock movement record.{% endif %}
+            </p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">
+                        <i class="fas fa-info-circle"></i> {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
         <form method="POST" action="">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="form-group mb-3">
-                <label class="form-label">Product</label>
+
+            <!-- Product Select -->
+            <div class="premium-field">
+                <label class="premium-field-label">
+                    <div class="label-icon"><i class="fas fa-box"></i></div>
+                    Product Select
+                </label>
                 <select name="product_id" class="form-control" required>
-                    <option value="" disabled selected>Select a product</option>
+                    <option value="" disabled selected>Choose a product</option>
                     {% for p in products %}
                         <option value="{{ p.id }}">{{ p.name }} ({{ p.sku }})</option>
                     {% endfor %}
@@ -28,29 +81,48 @@
             </div>
             
             {% if type == 'Receipt' %}
-                <div class="form-group mb-3">
-                    <label class="form-label">Supplier Name <span class="text-muted">(optional)</span></label>
+                <!-- Supplier -->
+                <div class="premium-field">
+                    <label class="premium-field-label">
+                        <div class="label-icon"><i class="fas fa-truck"></i></div>
+                        Supplier Name
+                    </label>
                     <input type="text" name="supplier_name" class="form-control" placeholder="e.g. Tata Steel Ltd">
                 </div>
             {% endif %}
             
             {% if type == 'Delivery' or type == 'Transfer' %}
-                <div class="form-group mb-3">
-                    <label class="form-label">From Warehouse</label>
+                <!-- From Warehouse -->
+                <div class="premium-field">
+                    <label class="premium-field-label">
+                        <div class="label-icon"><i class="fas fa-warehouse"></i></div>
+                        From Warehouse
+                    </label>
                     <select name="from_warehouse_id" class="form-control" required>
-                        <option value="" disabled selected>Select origin warehouse</option>
+                        <option value="" disabled selected>Select origin</option>
                         {% for w in warehouses %}
                             <option value="{{ w.id }}">{{ w.name }}</option>
                         {% endfor %}
                     </select>
+                </div>
+            {% endif %}
+
+            {% if type == 'Transfer' %}
+                <!-- Divider for Transfer -->
+                <div align="center" style="margin: -0.5rem 0 0.5rem;">
+                    <i class="fas fa-arrow-down text-muted"></i>
                 </div>
             {% endif %}
             
             {% if type == 'Receipt' or type == 'Transfer' or type == 'Adjustment' %}
-                <div class="form-group mb-3">
-                    <label class="form-label">To Warehouse</label>
+                <!-- To Warehouse -->
+                <div class="premium-field">
+                    <label class="premium-field-label">
+                        <div class="label-icon"><i class="fas fa-warehouse"></i></div>
+                        To Warehouse
+                    </label>
                     <select name="to_warehouse_id" class="form-control" required>
-                        <option value="" disabled selected>Select destination warehouse</option>
+                        <option value="" disabled selected>Select destination</option>
                         {% for w in warehouses %}
                             <option value="{{ w.id }}">{{ w.name }}</option>
                         {% endfor %}
@@ -58,14 +130,22 @@
                 </div>
             {% endif %}
             
-            <div class="form-group mb-3">
-                <label class="form-label">Quantity</label>
-                <input type="number" name="quantity" class="form-control" min="1" required>
+            <!-- Quantity -->
+            <div class="premium-field">
+                <label class="premium-field-label">
+                    <div class="label-icon"><i class="fas fa-hashtag"></i></div>
+                    Quantity
+                </label>
+                <input type="number" name="quantity" class="form-control" min="1" required placeholder="Enter quantity">
             </div>
             
-            <div class="form-group mb-3">
-                <button type="submit" class="btn btn-primary">Create {{ type }}</button>
-                <a href="{{ url_for('operations') }}" class="btn btn-outline ml-2">Cancel</a>
+            <div class="form-group mt-6">
+                <button type="submit" class="btn-premium" style="{% if type == 'Receipt' %}background:linear-gradient(135deg,#16a34a,#15803d);{% elif type == 'Delivery' %}background:var(--accent-gradient);{% elif type == 'Transfer' %}background:linear-gradient(135deg,#d97706,#b45309);{% elif type == 'Adjustment' %}background:linear-gradient(135deg,#0891b2,#0e7490);{% endif %}">
+                    <i class="fas fa-check-circle"></i> Complete {{ type }}
+                </button>
+                <a href="{{ url_for('operations') }}" class="btn-premium" style="background: var(--gray-100); color: var(--gray-600); box-shadow: none; margin-top: 0.75rem;">
+                    <i class="fas fa-times"></i> Cancel
+                </a>
             </div>
         </form>
     </div>

@@ -8,6 +8,10 @@ class LoginForm(FlaskForm):
     password = PasswordField('Password', validators=[DataRequired()])
     submit = SubmitField('Login')
 
+    def validate_email(self, email):
+        if not email.data.lower().endswith('@gmail.com'):
+            raise ValidationError('Only @gmail.com addresses are allowed.')
+
 class RegistrationForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired()])
     email = StringField('Email', validators=[DataRequired(), Email()])
@@ -22,6 +26,8 @@ class RegistrationForm(FlaskForm):
             raise ValidationError('That username is taken. Please choose a different one.')
 
     def validate_email(self, email):
+        if not email.data.lower().endswith('@gmail.com'):
+            raise ValidationError('Only @gmail.com addresses are allowed.')
         user = User.query.filter_by(email=email.data).first()
         if user:
             raise ValidationError('That email is taken. Please choose a different one.')
@@ -32,6 +38,7 @@ class ProductForm(FlaskForm):
     category = StringField('Category')
     unit = StringField('Unit (e.g. kg, piece)')
     min_stock_level = IntegerField('Minimum Stock Level', default=10)
+    warehouse_id = SelectField('Primary Warehouse', coerce=int, validators=[Optional()])
     submit = SubmitField('Save Product')
 
 class WarehouseForm(FlaskForm):
@@ -42,6 +49,10 @@ class WarehouseForm(FlaskForm):
 class ForgotPasswordForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Email()])
     submit = SubmitField('Request OTP')
+
+    def validate_email(self, email):
+        if not email.data.lower().endswith('@gmail.com'):
+            raise ValidationError('Only @gmail.com addresses are allowed.')
 
 class ResetPasswordForm(FlaskForm):
     otp = StringField('OTP', validators=[DataRequired()])
@@ -69,6 +80,8 @@ class UpdateProfileForm(FlaskForm):
                 raise ValidationError('That username is already taken.')
 
     def validate_email(self, email):
+        if not email.data.lower().endswith('@gmail.com'):
+            raise ValidationError('Only @gmail.com addresses are allowed.')
         if email.data != self.original_email:
             user = User.query.filter_by(email=email.data).first()
             if user:

@@ -1,85 +1,97 @@
 {% extends "base.html" %}
-{% block title %}Products - IMS Dashboard{% endblock %}
+{% block title %}Products - Inventory Tracker{% endblock %}
 {% block content %}
-<div class="card mb-6">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <div>
-            <h1 class="card-title">
-                <i class="fas fa-boxes text-primary"></i>
-                Product Management
-            </h1>
-            <p class="card-subtitle">
-                Manage your product catalog and view current stock levels.
-            </p>
-        </div>
-        {% if current_user.role == 'manager' %}
-            <a href="{{ url_for('new_product') }}" class="btn btn-primary">
-                <i class="fas fa-plus"></i> New Product
-            </a>
-        {% endif %}
+<div class="premium-card">
+    <div class="brand-row">
+        <div class="brand-icon"><i class="fas fa-boxes"></i></div>
+        <span class="brand-label">Inventory Assets</span>
     </div>
-</div>
 
-<div class="card">
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead>
+    <div class="premium-form-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h2 class="premium-form-title">Product Management</h2>
+                <p class="premium-form-subtitle">Manage your product catalog and view live stock levels.</p>
+            </div>
+            {% if current_user.role == 'manager' %}
+                <a href="{{ url_for('new_product') }}" class="btn-premium" style="width: auto; padding: 0.75rem 1.5rem;">
+                    <i class="fas fa-plus"></i> Add Product
+                </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="table-container" style="margin-top: 2rem;">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>SKU</th>
+                    <th>Product Name</th>
+                    <th>Category</th>
+                    <th>Unit</th>
+                    <th style="width: 250px;">Stock Distribution</th>
+                    <th>Min Level</th>
+                    <th>Status</th>
+                    {% if current_user.role == 'manager' %}
+                        <th style="text-align: right;">Actions</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in products %}
                     <tr>
-                        <th>SKU</th>
-                        <th>Name</th>
-                        <th>Category</th>
-                        <th>Unit</th>
-                        <th>Stock Level</th>
-                        <th>Min Stock Level</th>
-                        <th>Status</th>
+                        <td><code>{{ p.sku }}</code></td>
+                        <td style="font-weight: 700;">{{ p.name }}</td>
+                        <td><span class="text-muted">{{ p.category }}</span></td>
+                        <td>{{ p.unit }}</td>
+                        <td>
+                            <div style="font-weight: 800; font-size: 1rem; color: var(--gray-900); margin-bottom: 0.75rem;">
+                                {{ p.total_stock }} <small class="text-muted">{{ p.unit }}</small>
+                            </div>
+                            {% if p.stock_by_warehouse %}
+                                <div class="stock-distribution-stack">
+                                    {% for loc in p.stock_by_warehouse %}
+                                        <div class="stock-item">
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas fa-warehouse"></i>
+                                                <div class="d-flex flex-column" style="margin-left: 8px;">
+                                                    <span class="stock-wh-name">{{ loc.warehouse }}</span>
+                                                    {% if loc.location %}
+                                                        <span class="text-muted" style="font-size: 0.75rem;"><i class="fas fa-map-marker-alt" style="font-size: 0.7rem;"></i> {{ loc.location }}</span>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            <span class="stock-qty-badge">{{ loc.qty }}</span>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <div class="alert alert-info py-1 px-2" style="font-size: 0.7rem; border-radius: 6px; margin: 0;">
+                                    <i class="fas fa-info-circle"></i> No localized stock
+                                </div>
+                            {% endif %}
+                        </td>
+                        <td>{{ p.min_stock_level }}</td>
+                        <td>
+                            {% if p.total_stock == 0 %}
+                                <span class="badge badge-danger">Out</span>
+                            {% elif p.total_stock <= p.min_stock_level %}
+                                <span class="badge badge-warning">Low</span>
+                            {% else %}
+                                <span class="badge badge-success">Good</span>
+                            {% endif %}
+                        </td>
                         {% if current_user.role == 'manager' %}
-                            <th>Actions</th>
+                            <td style="text-align: right;">
+                                <a href="{{ url_for('edit_product', product_id=p.id) }}" class="btn btn-outline btn-sm">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                            </td>
                         {% endif %}
                     </tr>
-                </thead>
-                <tbody>
-                    {% for p in products %}
-                        <tr>
-                            <td><code>{{ p.sku }}</code></td>
-                            <td>{{ p.name }}</td>
-                            <td>{{ p.category }}</td>
-                            <td>{{ p.unit }}</td>
-                            <td>
-                                {{ p.total_stock }}
-                                <br>
-                                {% if p.stock_by_warehouse %}
-                                    {% for loc in p.stock_by_warehouse %}
-                                        <span class="badge badge-info" style="font-size:.75rem;margin:1px;">
-                                            {{ loc.warehouse }}: {{ loc.qty }} {{ loc.unit }}
-                                        </span>
-                                    {% endfor %}
-                                {% else %}
-                                    <span class="badge badge-danger">No stock</span>
-                                {% endif %}
-                            </td>
-                            <td>{{ p.min_stock_level }}</td>
-                            <td>
-                                {% if p.total_stock == 0 %}
-                                    <span class="badge badge-danger">Out of Stock</span>
-                                {% elif p.total_stock <= p.min_stock_level %}
-                                    <span class="badge badge-warning">Low Stock</span>
-                                {% else %}
-                                    <span class="badge badge-success">In Stock</span>
-                                {% endif %}
-                            </td>
-                            {% if current_user.role == 'manager' %}
-                                <td>
-                                    <a href="{{ url_for('edit_product', product_id=p.id) }}" class="btn btn-outline btn-sm">
-                                        <i class="fas fa-edit"></i> Edit
-                                    </a>
-                                </td>
-                            {% endif %}
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
 {% endblock %}
