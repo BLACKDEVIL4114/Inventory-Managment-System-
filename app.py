@@ -39,6 +39,8 @@ if app.config['SQLALCHEMY_DATABASE_URI'].startswith("postgres://"):
     app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace("postgres://", "postgresql://", 1)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'data_set'
+if os.environ.get('VERCEL'):
+    app.config['UPLOAD_FOLDER'] = '/tmp'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
 # Flask-Mail Configuration for Gmail SMTP
@@ -508,6 +510,18 @@ def dashboard():
         return redirect(url_for('staff_panel'))
 
     from datetime import datetime, date as date_type
+    
+    # Initialize all CSV-based metrics with defaults
+    total_revenue          = 0
+    health_score           = 0
+    growth_trend           = '—'
+    growth_is_positive     = True
+    csv_products_count     = 0
+    internal_transfers_csv = 0
+    sales_trend_labels    = []
+    sales_trend_delivered = []
+    sales_trend_received  = []
+    smart_insights        = [] # Global default for dashboard
 
     # ── Step 1: ALWAYS query live database ──────────────────
     all_products = [p for p in Product.query.all()
@@ -554,21 +568,16 @@ def dashboard():
     recent_operations = Operation.query.order_by(
         Operation.timestamp.desc()).limit(5).all()
 
-    # ── Step 2: Try to get business metrics from CSV ─────────
-    total_revenue          = 0
-    health_score           = 0
-    growth_trend           = '—'
-    growth_is_positive     = True
-    csv_products_count     = 0
-    internal_transfers_csv = 0
-    sales_trend_labels    = []
-    sales_trend_delivered = []
     sales_trend_received  = []
 
-    transaction_csv_path = os.path.join(
-        app.config['UPLOAD_FOLDER'], 'inventory_demo_dataset.csv')
-    summary_csv_path = os.path.join(
-        app.config['UPLOAD_FOLDER'], 'data.csv')
+    # Path resolution: Check /tmp first, then repo data_set
+    transaction_csv_path = os.path.join(app.config['UPLOAD_FOLDER'], 'inventory_demo_dataset.csv')
+    if not os.path.exists(transaction_csv_path):
+        transaction_csv_path = os.path.join('data_set', 'inventory_demo_dataset.csv')
+
+    summary_csv_path = os.path.join(app.config['UPLOAD_FOLDER'], 'data.csv')
+    if not os.path.exists(summary_csv_path):
+        summary_csv_path = os.path.join('data_set', 'data.csv')
     
     transaction_df = load_transaction_dataset(transaction_csv_path)
 
