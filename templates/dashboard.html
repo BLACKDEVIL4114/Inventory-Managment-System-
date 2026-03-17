@@ -33,15 +33,17 @@
             <span class="brand-label" style="letter-spacing: 0.05em; text-transform: uppercase; font-size: 0.9rem;">Enterprise Business Intelligence</span>
         </div>
         
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2.5rem;">
-            <div>
+        <div class="dashboard-header-row">
+            <div class="header-text-container">
                 <h1 class="premium-form-title" style="font-size: 2rem; margin-bottom: 0.5rem; letter-spacing: -0.02em;">Inventory Analytics</h1>
                 <p class="premium-form-subtitle" style="font-size: 0.95rem;">Welcome back, <strong>{{ current_user.username }}</strong>. Here's your system overview for <span class="text-primary">{{ current_date }}</span>.</p>
             </div>
-            <div class="badge badge-info" style="font-size: 0.65rem; padding: 0.5rem 1rem; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);">{{ current_user.role|upper }}</div>
+            <div class="mobile-badge-container">
+                <div class="badge badge-info" style="font-size: 0.65rem; padding: 0.5rem 1rem; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);">{{ current_user.role|upper }}</div>
+            </div>
         </div>
 
-        <div class="grid grid-4" style="gap: 1.5rem;">
+        <div class="grid grid-4 stats-grid" style="gap: 1.5rem;">
             <div class="stats-card">
                 <div class="summary-title" style="font-size: 0.65rem; font-weight: 800; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.05em;">Total Catalog</div>
                 <div class="stats-number">{{ total_products|default(0) }}</div>

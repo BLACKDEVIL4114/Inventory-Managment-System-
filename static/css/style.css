@@ -143,6 +143,22 @@ body {
     background: rgba(255, 255, 255, 0.8);
 }
 
+/* Mobile Menu Toggle */
+.mobile-menu-toggle {
+    display: none;
+    background: var(--accent-gradient);
+    border: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    color: white;
+    font-size: 1.25rem;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(220, 38, 38, 0.2);
+}
+
 .card:has(.dropdown) {
     overflow: visible;
 }
@@ -582,15 +598,104 @@ code {
 
 /* Responsive */
 @media (max-width: 1024px) {
-    .grid-4, .grid-3 { grid-template-columns: repeat(2, 1fr); }
+    .grid-4 { grid-template-columns: repeat(2, 1fr); }
+    .grid-3 { grid-template-columns: repeat(2, 1fr); }
     .floating-nav { margin: 1rem; }
+    .main-container { padding: 0 1rem; }
 }
 
 @media (max-width: 768px) {
     .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
-    .luxury-nav { display: none; }
-    .card { padding: 1.5rem; }
-    .table th, .table td { padding: 0.75rem; font-size: 0.8rem; }
+    
+    .mobile-menu-toggle { display: flex; }
+    
+    .floating-nav {
+        margin: 0.75rem;
+        padding: 0.5rem 1rem;
+        top: 0.75rem;
+    }
+
+    .nav-wrapper {
+        display: none;
+        position: absolute;
+        top: calc(100% + 10px);
+        left: 0;
+        right: 0;
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--glass-border);
+        border-radius: var(--border-radius-lg);
+        padding: 1rem;
+        box-shadow: var(--shadow-lg);
+        z-index: 1000;
+        border-top: 5px solid var(--primary-color);
+    }
+
+    .nav-wrapper.show {
+        display: block;
+        animation: slideUp 0.3s ease forwards;
+    }
+
+    .luxury-nav {
+        flex-direction: column;
+        align-items: flex-start;
+        width: 100%;
+        gap: 0.5rem;
+    }
+
+    .luxury-nav li {
+        width: 100%;
+    }
+
+    .nav-link {
+        padding: 0.75rem 1rem;
+        width: 100%;
+    }
+
+    .luxury-user {
+        border-top: 1px solid var(--gray-200);
+        margin-top: 0.5rem;
+        padding-top: 1rem;
+        justify-content: flex-start;
+        width: 100%;
+    }
+
+    .dropdown-menu {
+        position: static;
+        width: 100%;
+        box-shadow: none;
+        border: none;
+        background: rgba(0,0,0,0.03);
+        margin-top: 0.5rem;
+        display: none;
+    }
+
+    .dropdown-menu.show {
+        display: block;
+    }
+
+    .card { padding: 1.25rem; }
+    .card-title { font-size: 1.4rem; }
+    .table-container { 
+        border: none;
+        background: transparent;
+    }
+    .table th, .table td { padding: 0.75rem 0.5rem; font-size: 0.75rem; }
+    
+    /* Stats grid on mobile */
+    .grid-4.stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .grid-4.stats-grid {
+        grid-template-columns: 1fr;
+    }
+    .luxury-logo span {
+        display: none;
+    }
 }
 
 /* --- PREMIUM FORM DESIGN SYSTEM --- */
