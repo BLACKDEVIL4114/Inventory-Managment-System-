@@ -35,7 +35,7 @@
                 <ul class="navbar-nav luxury-nav">
                 {% if current_user.is_authenticated %}
                     <li class="nav-item">
-                        <span class="nav-link" style="opacity: 0.8; font-size: 0.75rem; display: flex; align-items: center; gap: 0.4rem;">
+                        <div class="nav-link storage-badge" onclick="showDatabaseDiagnostics()" style="opacity: 1; font-size: 0.75rem; display: flex; align-items: center; gap: 0.4rem; cursor: pointer; background: rgba(0,0,0,0.03); padding: 0.4rem 0.8rem; border-radius: 8px; transition: all 0.2s ease;">
                             <i class="fas fa-database"></i> 
                             {% if 'sqlite' in (config.get('SQLALCHEMY_DATABASE_URI') or '') %}
                                 <span style="color: #f59e0b; font-weight: 700;">TEMPORARY MODE</span>
@@ -44,7 +44,7 @@
                                 <span style="color: #10b981; font-weight: 700;">CLOUD STORAGE</span>
                                 <i class="fas fa-check-circle" style="color: #10b981; font-size: 0.6rem;" title="Persistence active"></i>
                             {% endif %}
-                        </span>
+                        </div>
                     </li>
                     {% if current_user.role == 'manager' %}
                         <li><a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}"><i class="fas fa-home"></i> Home</a></li>
@@ -164,6 +164,37 @@
     </div>
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script>
+        function showDatabaseDiagnostics() {
+            const isPersistent = {{ 'false' if 'sqlite' in (config.get('SQLALCHEMY_DATABASE_URI') or '') else 'true' }};
+            const overlay = document.createElement('div');
+            overlay.className = 'popup-overlay';
+            overlay.onclick = () => { overlay.style.opacity = '0'; setTimeout(() => overlay.remove(), 400); };
+            
+            overlay.innerHTML = `
+                <div class="popup-box" onclick="event.stopPropagation()">
+                    <div class="popup-accent" style="background: ${isPersistent ? 'linear-gradient(90deg, #10b981, #059669)' : 'linear-gradient(90deg, #f59e0b, #d97706)'}"></div>
+                    <div class="popup-icon" style="color: ${isPersistent ? '#10b981' : '#f59e0b'}">
+                        <i class="fas fa-${isPersistent ? 'shield-alt' : 'exclamation-triangle'}"></i>
+                    </div>
+                    <div class="popup-message" style="font-size: 1.2rem; margin-bottom: 1rem;">
+                        ${isPersistent ? 'Cloud Persistence Active' : 'Temporary Storage Active'}
+                    </div>
+                    <div style="text-align: left; font-size: 0.85rem; color: #475569; background: #f8fafc; padding: 1rem; border-radius: 12px; border: 1px solid #e2e8f0;">
+                        <div style="margin-bottom: 0.5rem;"><strong>Status:</strong> ${isPersistent ? 'Connected to Production DB' : 'Using local SQLite'}</div>
+                        <div style="margin-bottom: 0.5rem;"><strong>Persistence:</strong> ${isPersistent ? 'Safe (Data survives reloads)' : 'Unsafe (Data resets on Vercel)'}</div>
+                        <div><strong>Engine:</strong> ${isPersistent ? 'PostgreSQL (Cloud)' : 'SQLite (Local)'}</div>
+                    </div>
+                    <button class="popup-close" onclick="this.closest('.popup-overlay').click()">&times;</button>
+                    <div style="margin-top: 1.5rem;">
+                        <button onclick="this.closest('.popup-overlay').click()" style="padding: 0.6rem 1.5rem; border: none; border-radius: 8px; background: #f1f5f9; color: #475569; font-weight: 600; cursor: pointer;">Close</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+            setTimeout(() => overlay.style.opacity = '1', 10);
+        }
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>
