@@ -21,6 +21,13 @@
     .insight-pill.danger { border-left: 4px solid #dc2626; color: #991b1b; }
     .insight-pill.success { border-left: 4px solid #10b981; color: #065f46; }
     .insight-pill.info { border-left: 4px solid #3b82f6; color: #1e40af; }
+    .stats-number {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+        cursor: help;
+    }
 </style>
 {% endblock %}
 
@@ -71,19 +78,19 @@
         <div class="grid grid-4 stats-grid" style="gap: 1.5rem;">
             <div class="stats-card">
                 <div class="summary-title" style="font-size: 0.65rem; font-weight: 800; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.05em;">Total Catalog</div>
-                <div class="stats-number">{{ total_products|default(0) }}</div>
+                <div class="stats-number" title="{{ total_products }}">{{ total_products|default(0) }}</div>
                 <div class="text-muted" style="font-size: 0.6rem; font-weight: 700;">UNIQUE SKUs</div>
             </div>
 
             <div class="stats-card">
                 <div class="summary-title" style="font-size: 0.65rem; font-weight: 800; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.05em;">Attention Needed</div>
-                <div class="stats-number" style="color: #dc2626;">{{ low_stock_count|default(0) }}</div>
+                <div class="stats-number" style="color: #dc2626;" title="{{ low_stock_count }} items need attention">{{ low_stock_count|default(0) }}</div>
                 <div class="text-muted" style="font-size: 0.6rem; font-weight: 800; color: #dc2626;">STOCK ALERTS</div>
             </div>
 
             <div class="stats-card">
                 <div class="summary-title" style="font-size: 0.65rem; font-weight: 800; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.05em;">Estimated Revenue</div>
-                <div class="stats-number">₹{{ "{:,.0f}".format(total_revenue|default(0)) }}</div>
+                <div class="stats-number" title="₹{{ '{:,.2f}'.format(total_revenue|default(0)) }}">₹{{ "{:,.0f}".format(total_revenue|default(0)) }}</div>
                 <div class="text-muted" style="font-size: 0.6rem; font-weight: 700;">
                     {% if growth_is_positive %}
                         <span style="color: #10b981;"><i class="fas fa-arrow-up"></i> {{ growth_trend|default('0%') }} GROWTH</span>
@@ -95,7 +102,7 @@
 
             <div class="stats-card">
                 <div class="summary-title" style="font-size: 0.65rem; font-weight: 800; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.05em;">System Performance</div>
-                <div class="stats-number" style="color: #10b981;">{{ health_score|default(0) }}%</div>
+                <div class="stats-number" style="color: #10b981;" title="Calculated health score: {{ health_score|default(0) }}%">{{ health_score|default(0) }}%</div>
                 <div class="text-muted" style="font-size: 0.6rem; font-weight: 700;">HEALTH INDEX</div>
             </div>
         </div>

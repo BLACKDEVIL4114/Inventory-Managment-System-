@@ -725,7 +725,7 @@ def dashboard():
         internal_transfers=internal_transfers,
         today_operations=today_operations,
         total_revenue=total_revenue,
-        health_score=100 - min(100, (low_stock_count/total_products*100)) if total_products > 0 else 100,
+        health_score=round(100 - min(100, (low_stock_count/total_products*100)), 1) if total_products > 0 else 100,
         growth_trend=growth_trend,
         growth_is_positive=growth_is_positive,
         sales_trend_labels=sales_trend_labels,
