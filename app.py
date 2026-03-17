@@ -18,10 +18,15 @@ from utils import load_inventory_data, validate_csv_data, calculate_inventory_me
 warnings.filterwarnings('ignore', category=UserWarning)
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
-app.config['SESSION_COOKIE_SECURE'] = False  # Set to True only when using HTTPS
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-key-for-local-dev-only')
+if os.environ.get('VERCEL'):
+    app.config['SESSION_COOKIE_SECURE'] = True  # Required for HTTPS on Vercel
+else:
+    app.config['SESSION_COOKIE_SECURE'] = False
+
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///inventory.db')
 
 # Vercel-specific database adjustments
@@ -457,11 +462,16 @@ def profile():
 
 @app.route("/health")
 def health_check():
+    db_uri = app.config['SQLALCHEMY_DATABASE_URI']
+    db_type = "PostgreSQL" if db_uri.startswith('postgresql') else "SQLite (Temporary/Local)"
+    
     return jsonify({
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
-        "database_uri": app.config['SQLALCHEMY_DATABASE_URI'].split('@')[-1], # Mask credentials
-        "vercel_env": bool(os.environ.get('VERCEL'))
+        "database_type": db_type,
+        "database_location": db_uri.split('@')[-1], # Mask credentials
+        "vercel_environment": bool(os.environ.get('VERCEL')),
+        "secret_key_stable": os.environ.get('SECRET_KEY') is not None
     }), 200
 
 @app.route("/")
