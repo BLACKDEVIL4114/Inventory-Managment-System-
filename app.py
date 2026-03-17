@@ -582,6 +582,7 @@ def dashboard():
 
     return render_template('dashboard.html',
         now                  = datetime.now(),
+        current_date         = datetime.now().strftime('%d %b %Y'),
         total_products       = total_products,
         low_stock_count      = low_stock_count,
         out_of_stock_count   = out_of_stock_count,

@@ -95,7 +95,7 @@
             {% for insight in smart_insights %}
             <div style="background: white; padding: 1.25rem; border-radius: var(--border-radius-lg); border: 1px solid var(--gray-100); box-shadow: 0 4px 15px rgba(0,0,0,0.02); display: flex; align-items: flex-start; gap: 1rem; transition: transform 0.3s ease;" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='translateY(0)'">
                 <div style="width: 8px; height: 8px; background: var(--primary-color); border-radius: 50%; margin-top: 6px; flex-shrink: 0;"></div>
-                <p style="font-size: 0.88rem; color: var(--gray-700); line-height: 1.6; font-weight: 500;">{{ insight }}</p>
+                <p style="font-size: 0.88rem; color: var(--gray-700); line-height: 1.6; font-weight: 500;">{{ insight.text if insight is mapping else insight }}</p>
             </div>
             {% endfor %}
         </div>
@@ -193,7 +193,7 @@
                                 </td>
                                 <td style="padding: 0.75rem 1rem;">
                                     <div style="font-weight: 600;">
-                                        {% if op.movements %}
+                                        {% if op.movements and op.movements[0].product %}
                                             {{ op.movements[0].product.name[:12] }}...
                                         {% else %}
                                             Task #{{ op.id }}
@@ -201,7 +201,7 @@
                                     </div>
                                     <div class="text-muted" style="font-size: 0.6rem;">{{ op.timestamp.strftime('%H:%M %p') }}</div>
                                 </td>
-                                <td class="text-right" style="padding: 0.75rem 1rem;"><span class="badge" style="font-size: 0.55rem; background: var(--gray-100); color: var(--gray-700);">{{ op.user.username }}</span></td>
+                                <td class="text-right" style="padding: 0.75rem 1rem;"><span class="badge" style="font-size: 0.55rem; background: var(--gray-100); color: var(--gray-700);">{{ op.user.username if op.user else 'System' }}</span></td>
                             </tr>
                             {% endfor %}
                         </tbody>
