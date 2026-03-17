@@ -100,11 +100,21 @@
                 <div class="grid grid-2" style="gap: 1.5rem;">
                     <div class="premium-field">
                         <label class="premium-field-label"><div class="label-icon"><i class="fas fa-user"></i></div> Username</label>
-                        {{ form.username(class="form-control") }}
+                        {{ form.username(class="form-control" + (" is-invalid" if form.username.errors else "")) }}
+                        {% if form.username.errors %}
+                            <div class="invalid-feedback" style="display: block; font-size: 0.7rem; color: var(--primary-color); margin-top: 4px; font-weight: 700;">
+                                {% for error in form.username.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
                     </div>
                     <div class="premium-field">
                         <label class="premium-field-label"><div class="label-icon"><i class="fas fa-envelope"></i></div> Email</label>
-                        {{ form.email(class="form-control") }}
+                        {{ form.email(class="form-control" + (" is-invalid" if form.email.errors else "")) }}
+                        {% if form.email.errors %}
+                            <div class="invalid-feedback" style="display: block; font-size: 0.7rem; color: var(--primary-color); margin-top: 4px; font-weight: 700;">
+                                {% for error in form.email.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
                     </div>
                 </div>
 
@@ -115,11 +125,21 @@
                 <div class="grid grid-2" style="gap: 1.5rem;">
                     <div class="premium-field">
                         <label class="premium-field-label"><div class="label-icon"><i class="fas fa-key"></i></div> New Password</label>
-                        {{ form.new_password(class="form-control", placeholder="Leave blank to keep current") }}
+                        {{ form.new_password(class="form-control" + (" is-invalid" if form.new_password.errors else ""), placeholder="Leave blank to keep current") }}
+                        {% if form.new_password.errors %}
+                            <div class="invalid-feedback" style="display: block; font-size: 0.7rem; color: var(--primary-color); margin-top: 4px; font-weight: 700;">
+                                {% for error in form.new_password.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
                     </div>
                     <div class="premium-field">
                         <label class="premium-field-label"><div class="label-icon"><i class="fas fa-lock"></i></div> Confirm Password</label>
-                        {{ form.confirm_password(class="form-control", placeholder="Repeat new password") }}
+                        {{ form.confirm_password(class="form-control" + (" is-invalid" if form.confirm_password.errors else ""), placeholder="Repeat new password") }}
+                        {% if form.confirm_password.errors %}
+                            <div class="invalid-feedback" style="display: block; font-size: 0.7rem; color: var(--primary-color); margin-top: 4px; font-weight: 700;">
+                                {% for error in form.confirm_password.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
                     </div>
                 </div>
 
