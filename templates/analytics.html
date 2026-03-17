@@ -310,350 +310,191 @@ document.addEventListener('DOMContentLoaded', () => {
   const loadingOvl = document.getElementById('loadingOverlay');
   const dashCont   = document.getElementById('dashboardContainer');
   const loadingMsg = document.getElementById('loadingMsg');
-  const selCat     = document.getElementById('primaryCatFilter');
-  const selNum1    = document.getElementById('primaryNumFilter');
-  const selNum2    = document.getElementById('secondaryNumFilter');
-  const selChart   = document.getElementById('chartTypeFilter');
+  const insightsList = document.getElementById('insightsList');
 
-  let gData = [], gCols = {numeric:[],categorical:[],date:[]};
-  let aKeys = {cat:null,num1:null,num2:null};
   let charts = {main:null,donut:null,line:null,scatter:null,hist:null,hbar:null};
-
   const C = ['#dc2626','#9d174d','#f43f5e','#ef4444','#991b1b','#fca5a5','#4f46e5','#10b981','#f59e0b','#06b6d4'];
+
+  /* ── Page Init ── */
+  loadRealData();
 
   /* ── drag/drop ── */
   uploadZone.addEventListener('dragover',  e=>{e.preventDefault();uploadZone.classList.add('dragover');});
   uploadZone.addEventListener('dragleave', ()=>uploadZone.classList.remove('dragover'));
   uploadZone.addEventListener('drop', e=>{
     e.preventDefault(); uploadZone.classList.remove('dragover');
-    if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+    if(e.dataTransfer.files[0]) uploadFile(e.dataTransfer.files[0]);
   });
   fileInput.addEventListener('change', e=>{
-    if(e.target.files[0]) handleFile(e.target.files[0]);
+    if(e.target.files[0]) uploadFile(e.target.files[0]);
     e.target.value='';
   });
 
-  /* ── demo data ── */
-  document.getElementById('loadDemoBtn').addEventListener('click', ()=>{
-    const rows=[], cats=['Steel','Plastic','Wood','Fabric','Electronics'], whs=['Main Warehouse','Production Floor','Store A'];
-    for(let i=0;i<80;i++) rows.push({
-      ProductName: cats[i%5]+' Item '+(i+1),
-      Category   : cats[i%5],
-      Warehouse  : whs[i%3],
-      Quantity   : Math.floor(Math.random()*300)+10,
-      MinStock   : Math.floor(Math.random()*50)+5,
-      Revenue    : Math.floor(Math.random()*50000)+1000,
-      Month      : ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug'][i%8]
-    });
-    document.getElementById('datasetNameLabel').textContent = 'demo_inventory.csv';
-    document.getElementById('lastUpdatedBadge').textContent = 'DEMO – '+new Date().toLocaleTimeString();
-    processData(rows);
+  /* ── demo data (now handled by server) ── */
+  document.getElementById('loadDemoBtn').addEventListener('click', () => {
+      // In a real app, this might trigger a server-side seed or just reload
+      window.location.reload();
   });
 
   /* ── reset / export ── */
-  document.getElementById('resetBtn').addEventListener('click', ()=>{
+  document.getElementById('resetBtn').addEventListener('click', () => {
     dashCont.style.display='none'; uploadZone.style.display='flex';
     window.scrollTo({top:0,behavior:'smooth'});
   });
-  document.getElementById('exportCsvBtn').addEventListener('click', ()=>{
-    if(!gData.length) return;
-    const a=Object.assign(document.createElement('a'),{
-      href:URL.createObjectURL(new Blob([Papa.unparse(gData)],{type:'text/csv'})),
-      download:'analytics_export.csv'
-    }); a.click();
-  });
-  document.getElementById('exportImgBtn').addEventListener('click', ()=>{
-    const btn=document.getElementById('exportImgBtn');
-    btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Generating…'; btn.disabled=true;
-    html2canvas(dashCont,{scale:2,useCORS:true,logging:false}).then(canvas=>{
-      Object.assign(document.createElement('a'),{
-        href:canvas.toDataURL('image/png'),
-        download:'analytics_'+new Date().toISOString().slice(0,10)+'.png'
-      }).click();
-      btn.innerHTML='<i class="fas fa-image"></i> Save Image'; btn.disabled=false;
+
+  /* ── upload handler ── */
+  async function uploadFile(file) {
+    loadingOvl.style.display = 'block';
+    loadingMsg.textContent = `Uploading and syncing ${file.name}...`;
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+        const response = await fetch('/analytics/upload', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': '{{ csrf_token() }}'
+            }
+        });
+        
+        if (response.redirected) {
+            window.location.href = response.url;
+            return;
+        }
+        
+        const result = await response.text();
+        // Since the route flashes and redirects, we usually hit the redirected block above.
+        window.location.reload();
+    } catch (err) {
+        alert('Upload failed: ' + err.message);
+        loadingOvl.style.display = 'none';
+    }
+  }
+
+  /* ── Data Fetching ── */
+  async function loadRealData() {
+    try {
+        const [kpiRes, revRes, invRes, prodRes] = await Promise.all([
+            fetch('/api/analytics/kpis'),
+            fetch('/api/analytics/revenue'),
+            fetch('/api/analytics/inventory'),
+            fetch('/api/analytics/products')
+        ]);
+
+        const kpis = await kpiRes.json();
+        const revenue = await revRes.json();
+        const inventory = await invRes.json();
+        const products = await prodRes.json();
+
+        renderDashboard(kpis, revenue, inventory, products);
+        dashCont.style.display = 'block';
+        uploadZone.style.display = 'none';
+        document.getElementById('lastUpdatedBadge').textContent = 'LIVE – ' + new Date().toLocaleTimeString();
+    } catch (err) {
+        console.error('Failed to load analytics:', err);
+        // If no data, keep upload zone visible
+    }
+  }
+
+  function renderDashboard(kpis, revenue, inventory, products) {
+    renderKPIs(kpis);
+    renderInsights(kpis, products);
+    renderCharts(revenue, inventory, products);
+  }
+
+  function renderKPIs(kpis) {
+    const g = document.getElementById('kpiGrid');
+    const items = [
+        {title: 'Total Revenue', value: '₹' + kpis.total_revenue.toLocaleString(), sub: 'Lifetime sales'},
+        {title: 'Avg Order Value', value: '₹' + kpis.avg_order_value.toFixed(0), sub: 'Value per delivery'},
+        {title: 'Total Delivered', value: kpis.total_delivered, sub: 'Units shipped'},
+        {title: 'Critical Stock', value: kpis.low_stock_count, sub: 'Needs attention'}
+    ];
+    g.innerHTML = items.map(k => `
+        <div class="kpi-card">
+            <div class="kpi-title">${k.title}</div>
+            <div class="kpi-value">${k.value}</div>
+            <div class="kpi-sub">${k.sub}</div>
+        </div>
+    `).join('');
+  }
+
+  function renderInsights(kpis, products) {
+    const items = [];
+    if (kpis.low_stock_count > 0) {
+        items.push({ic: 'fa-exclamation-triangle', cl: 'red', t: `<strong>Critical Warning:</strong> ${kpis.low_stock_count} products are currently at or below minimum stock levels.`});
+    }
+    if (products.top_sales && products.top_sales.length > 0) {
+        const top = products.top_sales[0];
+        items.push({ic: 'fa-trophy', cl: 'green', t: `<strong>Top Performer:</strong> ${top.product_name} is your bestseller with ${top.qty_delivered} units delivered.`});
+    }
+    insightsList.innerHTML = items.map(i => `<li><div class="ins-icon ${i.cl}"><i class="fas ${i.ic}"></i></div><span>${i.t}</span></li>`).join('');
+  }
+
+  function renderCharts(revenue, inventory, products) {
+    // Kill existing
+    Object.values(charts).forEach(c => { if(c) c.destroy(); });
+
+    // 1. Revenue Trend
+    charts.line = new Chart(document.getElementById('lineChart'), {
+        type: 'line',
+        data: {
+            labels: revenue.map(r => r.date),
+            datasets: [{
+                label: 'Daily Revenue',
+                data: revenue.map(r => r.revenue),
+                borderColor: '#dc2626',
+                backgroundColor: 'rgba(220,38,38,0.1)',
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
     });
-  });
 
-  /* ── file handler ── */
-  function handleFile(file){
-    const ext=file.name.split('.').pop().toLowerCase();
-    document.getElementById('datasetNameLabel').textContent=file.name;
-    document.getElementById('lastUpdatedBadge').textContent=new Date().toLocaleString();
-    uploadZone.style.display='none'; loadingOvl.style.display='block';
-    loadingMsg.textContent='Reading '+file.name+'…';
-    if(ext==='csv'){
-      Papa.parse(file,{header:true,dynamicTyping:true,skipEmptyLines:true,
-        complete:r=>processData(r.data), error:e=>showErr('CSV error: '+e.message)});
-    } else {
-      const reader=new FileReader();
-      reader.onload=e=>{
-        try{
-          const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
-          processData(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''}));
-        }catch(err){showErr('Excel error: '+err.message);}
-      };
-      reader.readAsArrayBuffer(file);
-    }
-  }
-  function showErr(msg){loadingOvl.style.display='none';uploadZone.style.display='flex';alert(msg);}
-
-  /* ── process data ── */
-  function processData(data){
-    if(!data||!data.length){showErr('File is empty or badly formatted.');return;}
-    gData=data; killCharts(); loadingMsg.textContent='Detecting column types…';
-    const keys=Object.keys(data[0]);
-    const cols={numeric:[],categorical:[],date:[]};
-    keys.forEach(k=>{
-      let s=null;
-      for(let i=0;i<Math.min(10,data.length);i++){if(data[i][k]!==null&&data[i][k]!==''&&data[i][k]!==undefined){s=data[i][k];break;}}
-      if(s===null){cols.categorical.push(k);return;}
-      if(typeof s==='number'){cols.numeric.push(k);return;}
-      const str=String(s).trim();
-      if(!isNaN(parseFloat(str))&&isFinite(str.replace(/[₹$,]/g,''))){cols.numeric.push(k);return;}
-      if(isNaN(str)&&Date.parse(str)){cols.date.push(k);return;}
-      cols.categorical.push(k);
+    // 2. Inventory Distribution
+    charts.donut = new Chart(document.getElementById('donutChart'), {
+        type: 'doughnut',
+        data: {
+            labels: ['Received', 'Delivered', 'Adjustments'],
+            datasets: [{
+                data: [inventory.received, inventory.delivered, Math.abs(inventory.adjusted)],
+                backgroundColor: ['#10b981', '#dc2626', '#f59e0b']
+            }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
     });
-    data.forEach(r=>cols.numeric.forEach(c=>{
-      const v=typeof r[c]==='string'?parseFloat(r[c].replace(/[^0-9.-]/g,'')):r[c];
-      r[c]=isNaN(v)?0:v;
-    }));
-    gCols=cols;
-    aKeys.cat  =[...cols.categorical,...cols.date][0]||null;
-    aKeys.num1 =cols.numeric[0]||null;
-    aKeys.num2 =cols.numeric[1]||cols.numeric[0]||null;
-    populateFilters(); renderAll();
-    setTimeout(()=>{loadingOvl.style.display='none';dashCont.style.display='block';},400);
-  }
 
-  /* ── filters ── */
-  function populateFilters(){
-    const catO=[...gCols.categorical,...gCols.date];
-    selCat.innerHTML  =catO.map(c=>`<option value="${c}" ${c===aKeys.cat?'selected':''}>${c}</option>`).join('');
-    selNum1.innerHTML =gCols.numeric.map(c=>`<option value="${c}" ${c===aKeys.num1?'selected':''}>${c}</option>`).join('');
-    selNum2.innerHTML =gCols.numeric.map(c=>`<option value="${c}" ${c===aKeys.num2?'selected':''}>${c}</option>`).join('');
-    const onChange=()=>{aKeys.cat=selCat.value;aKeys.num1=selNum1.value;aKeys.num2=selNum2.value;renderAll();};
-    selCat.onchange=selNum1.onchange=selNum2.onchange=selChart.onchange=onChange;
-  }
-
-  function renderAll(){renderKPIs();renderStats();renderInsights();renderCharts();renderTable(gData,Object.keys(gData[0]));}
-
-  /* ── helpers ── */
-  function fmt(n){
-    if(n===null||n===undefined||isNaN(n))return'—';
-    if(Math.abs(n)>=1e6)return(n/1e6).toFixed(2)+'M';
-    if(Math.abs(n)>=1e3)return(n/1e3).toFixed(1)+'k';
-    return Number.isInteger(n)?n:n.toFixed(2);
-  }
-  function aggBy(ck,nk,lim=10){
-    if(!ck||!nk)return{labels:[],data:[]};
-    const agg={};
-    gData.forEach(r=>{const c=String(r[ck]||'Other');agg[c]=(agg[c]||0)+(Number(r[nk])||0);});
-    const s=Object.entries(agg).sort((a,b)=>b[1]-a[1]).slice(0,lim);
-    return{labels:s.map(i=>i[0].substring(0,18)),data:s.map(i=>i[1])};
-  }
-  function killCharts(){Object.keys(charts).forEach(k=>{if(charts[k]){charts[k].destroy();charts[k]=null;}});}
-
-  /* ── KPIs ── */
-  function renderKPIs(){
-    const g=document.getElementById('kpiGrid'); g.innerHTML='';
-    const kpis=[{title:'Total Records',value:gData.length,sub:'rows in dataset',trend:''}];
-    gCols.numeric.slice(0,3).forEach((col,i)=>{
-      const sum=gData.reduce((a,r)=>a+(Number(r[col])||0),0);
-      const trendHtml=['<span class="kpi-trend up"><i class="fas fa-caret-up"></i> +8.4%</span>',
-        '<span class="kpi-trend down"><i class="fas fa-caret-down"></i> -2.1%</span>',
-        '<span class="kpi-trend up"><i class="fas fa-caret-up"></i> +12.5%</span>'][i];
-      kpis.push({title:col.replace(/_/g,' '),value:fmt(sum),sub:'avg '+fmt(sum/gData.length),trend:trendHtml});
+    // 3. Top Products by Sales
+    charts.hbar = new Chart(document.getElementById('hbarChart'), {
+        type: 'bar',
+        data: {
+            labels: products.top_sales.map(p => p.product_name),
+            datasets: [{
+                label: 'Units Sold',
+                data: products.top_sales.map(p => p.qty_delivered),
+                backgroundColor: C
+            }]
+        },
+        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false }
     });
-    kpis.forEach(k=>{g.innerHTML+=`<div class="kpi-card"><div class="kpi-title">${k.title}</div><div class="kpi-value">${k.value} ${k.trend}</div><div class="kpi-sub">${k.sub}</div></div>`;});
-  }
 
-  /* ── Stats bar ── */
-  function renderStats(){
-    const bar=document.getElementById('statsBar'), col=aKeys.num1;
-    if(!col){bar.innerHTML='';return;}
-    const vals=gData.map(r=>Number(r[col])||0).sort((a,b)=>a-b);
-    const n=vals.length, sum=vals.reduce((a,b)=>a+b,0), mean=sum/n;
-    const mid=Math.floor(n/2), med=n%2===0?(vals[mid-1]+vals[mid])/2:vals[mid];
-    const std=Math.sqrt(vals.map(v=>(v-mean)**2).reduce((a,b)=>a+b,0)/n);
-    const q1=vals[Math.floor(n*.25)], q3=vals[Math.floor(n*.75)];
-    const stats=[{l:'Min',v:fmt(vals[0])},{l:'Max',v:fmt(vals[n-1])},{l:'Mean',v:fmt(mean)},
-      {l:'Median',v:fmt(med)},{l:'Std Dev',v:fmt(std)},{l:'Q1',v:fmt(q1)},{l:'Q3',v:fmt(q3)},{l:'IQR',v:fmt(q3-q1)}];
-    bar.innerHTML=stats.map(s=>`<div class="stat-cell"><div class="slabel">${s.l}</div><div class="sval">${s.v}</div></div>`).join('');
-  }
-
-  /* ── Insights ── */
-  function renderInsights(){
-    const list=document.getElementById('insightsList'), cat=aKeys.cat, n1=aKeys.num1, n2=aKeys.num2;
-    const items=[];
-
-    if(cat&&n1){
-      const agg={};let tot=0;
-      gData.forEach(r=>{const c=String(r[cat]||'?');agg[c]=(agg[c]||0)+(Number(r[n1])||0);tot+=(Number(r[n1])||0);});
-      const top=Object.entries(agg).sort((a,b)=>b[1]-a[1])[0];
-      if(top&&tot>0){const p=((top[1]/tot)*100).toFixed(1);
-        items.push({ic:'fa-chart-pie',cl:'red',t:`<strong>${top[0]}</strong> leads <em>${n1}</em> with <strong>${p}%</strong> of total volume.`});}
-    }
-    if(n1&&n2&&n1!==n2){
-      let s1=0,s2=0,s1q=0,s2q=0,sp=0,sn=Math.min(gData.length,500);
-      for(let i=0;i<sn;i++){const x=Number(gData[i][n1])||0,y=Number(gData[i][n2])||0;s1+=x;s2+=y;s1q+=x*x;s2q+=y*y;sp+=x*y;}
-      const r=(sp-s1*s2/sn)/Math.sqrt((s1q-s1*s1/sn)*(s2q-s2*s2/sn)||1);
-      if(r>0.6) items.push({ic:'fa-arrow-trend-up',cl:'green',t:`<strong>Positive correlation (r=${r.toFixed(2)})</strong> between <em>${n1}</em> and <em>${n2}</em> — they rise together.`});
-      else if(r<-0.6) items.push({ic:'fa-arrow-trend-down',cl:'red',t:`<strong>Negative correlation (r=${r.toFixed(2)})</strong> between <em>${n1}</em> and <em>${n2}</em>.`});
-    }
-    if(n1){
-      const vals=gData.map(r=>Number(r[n1])||0).sort((a,b)=>a-b);
-      const q1=vals[Math.floor(vals.length*.25)],q3=vals[Math.floor(vals.length*.75)];
-      const out=vals.filter(v=>v>q3+1.5*(q3-q1));
-      if(out.length) items.push({ic:'fa-exclamation-circle',cl:'amber',t:`<strong>${out.length} outlier${out.length>1?'s':''}</strong> detected in <em>${n1}</em> via IQR method. May skew averages.`});
-      const zeros=gData.filter(r=>!r[n1]||Number(r[n1])===0).length;
-      if(zeros) items.push({ic:'fa-info-circle',cl:'blue',t:`<strong>${zeros} rows (${((zeros/gData.length)*100).toFixed(1)}%)</strong> have zero/missing values in <em>${n1}</em>.`});
-    }
-    if(cat){
-      const uniq=new Set(gData.map(r=>r[cat])).size;
-      items.push({ic:'fa-tag',cl:'blue',t:`<strong>${uniq} unique values</strong> found in <em>${cat}</em> across ${gData.length} records.`});
-    }
-    if(!items.length) items.push({ic:'fa-lightbulb',cl:'amber',t:'Change the dropdowns above to explore correlations and anomalies in your data.'});
-    list.innerHTML=items.map(i=>`<li><div class="ins-icon ${i.cl}"><i class="fas ${i.ic}"></i></div><span>${i.t}</span></li>`).join('');
-  }
-
-  /* ── Charts ── */
-  Chart.defaults.font.family="'Inter',sans-serif";
-  Chart.defaults.color='#64748b';
-
-  function renderCharts(){
-    killCharts();
-    const cat=aKeys.cat,n1=aKeys.num1,n2=aKeys.num2,ct=selChart.value;
-
-    /* Main chart */
-    if(cat&&n1){
-      const d=aggBy(cat,n1,12);
-      document.getElementById('mainChartTitle').innerHTML=`<strong>${cat}</strong> by ${n1}`;
-      document.getElementById('mainChartTag').textContent=ct.toUpperCase();
-      if(ct==='line'){
-        charts.main=new Chart(document.getElementById('mainChart'),{type:'line',
-          data:{labels:d.labels,datasets:[{label:n1,data:d.data,borderColor:C[0],backgroundColor:'rgba(220,38,38,.07)',fill:true,tension:.4,pointRadius:4,pointBackgroundColor:'#fff',pointBorderColor:C[0],borderWidth:2}]},
-          options:baseOpts()});
-      } else if(ct==='scatter'&&n2){
-        const pts=gData.slice(0,200).map(r=>({x:Number(r[n1])||0,y:Number(r[n2])||0}));
-        charts.main=new Chart(document.getElementById('mainChart'),{type:'scatter',
-          data:{datasets:[{label:n1+' vs '+n2,data:pts,backgroundColor:'rgba(220,38,38,.55)',borderColor:C[0],borderWidth:1,pointRadius:5}]},
-          options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
-            scales:{x:{title:{display:true,text:n1}},y:{title:{display:true,text:n2||'—'}}}}});
-      } else {
-        charts.main=new Chart(document.getElementById('mainChart'),{type:'bar',
-          data:{labels:d.labels,datasets:[{label:n1,data:d.data,backgroundColor:C[0],hoverBackgroundColor:C[2],borderRadius:5,borderSkipped:false,barThickness:ct==='horizontalBar'?18:22}]},
-          options:{indexAxis:ct==='horizontalBar'?'y':'x',responsive:true,maintainAspectRatio:false,
-            plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(0,0,0,.03)'}},x:{grid:{display:ct!=='horizontalBar'}}}}});
-      }
-    }
-
-    /* Donut */
-    if(cat&&n2){
-      const d=aggBy(cat,n2,7);
-      document.getElementById('donutChartTitle').innerHTML=`${n2} by ${cat}`;
-      charts.donut=new Chart(document.getElementById('donutChart'),{type:'doughnut',
-        data:{labels:d.labels,datasets:[{data:d.data,backgroundColor:C,borderWidth:2,borderColor:'#fff',hoverOffset:6}]},
-        options:{responsive:true,maintainAspectRatio:false,cutout:'72%',
-          plugins:{legend:{position:'right',labels:{boxWidth:11,usePointStyle:true,padding:14}}}}});
-    }
-
-    /* Line + MA */
-    if(cat&&n1){
-      const agg={};
-      gData.forEach(r=>{const c=String(r[cat]||'?');agg[c]=(agg[c]||0)+(Number(r[n1])||0);});
-      let keys=Object.keys(agg);
-      if(gCols.date.includes(cat)) keys.sort(); else keys.sort((a,b)=>agg[b]-agg[a]);
-      if(keys.length>40) keys=keys.filter((_,i)=>i%Math.ceil(keys.length/40)===0);
-      const pd=keys.map(k=>agg[k]);
-      const ma=pd.map((_,i)=>i<2?null:pd.slice(Math.max(0,i-4),i+1).reduce((a,b)=>a+b,0)/Math.min(5,i+1));
-      const ds=[
-        {label:n1,data:pd,borderColor:C[0],backgroundColor:'rgba(220,38,38,.06)',fill:true,tension:.4,pointRadius:3,pointBackgroundColor:'#fff',pointBorderColor:C[0],borderWidth:2},
-        {label:'MA(5)',data:ma,borderColor:'#f59e0b',backgroundColor:'transparent',borderDash:[5,5],tension:.4,pointRadius:0,borderWidth:2}
-      ];
-      if(n2&&n2!==n1){
-        const agg2={};
-        gData.forEach(r=>{const c=String(r[cat]||'?');agg2[c]=(agg2[c]||0)+(Number(r[n2])||0);});
-        ds.push({label:n2,data:keys.map(k=>agg2[k]||0),borderColor:'#4f46e5',backgroundColor:'transparent',borderDash:[5,5],tension:.4,pointRadius:3,pointBackgroundColor:'#fff',pointBorderColor:'#4f46e5',borderWidth:2});
-      }
-      document.getElementById('lineChartTitle').innerHTML=`${n1}${n2&&n2!==n1?' &amp; '+n2:''} <span style="font-size:.72rem;color:var(--gray-600)">+ MA(5)</span>`;
-      charts.line=new Chart(document.getElementById('lineChart'),{type:'line',
-        data:{labels:keys.map(k=>k.substring(0,14)),datasets:ds},
-        options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
-          plugins:{legend:{position:'top',align:'end',labels:{usePointStyle:true,boxWidth:8}}},
-          scales:{y:{beginAtZero:true,grid:{color:'rgba(0,0,0,.03)'}},x:{grid:{display:false}}}}});
-    }
-
-    /* Scatter */
-    if(n1&&n2&&n1!==n2){
-      document.getElementById('scatterChartTitle').innerHTML=`${n1} vs ${n2}`;
-      const pts=gData.slice(0,300).map(r=>({x:Number(r[n1])||0,y:Number(r[n2])||0,label:r[cat]||''}));
-      charts.scatter=new Chart(document.getElementById('scatterChart'),{type:'scatter',
-        data:{datasets:[{label:'Points',data:pts,backgroundColor:'rgba(220,38,38,.5)',borderColor:C[0],borderWidth:1,pointRadius:4,pointHoverRadius:7}]},
-        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
-          tooltip:{callbacks:{label:c=>`${c.raw.label||'Row'}: (${fmt(c.raw.x)}, ${fmt(c.raw.y)})`}}},
-          scales:{x:{title:{display:true,text:n1},grid:{color:'rgba(0,0,0,.03)'}},y:{title:{display:true,text:n2},grid:{color:'rgba(0,0,0,.03)'}}}}});
-    } else {
-      document.getElementById('scatterChartTitle').textContent='Select two distinct numeric metrics';
-    }
-
-    /* Histogram */
-    if(n1){
-      const vals=gData.map(r=>Number(r[n1])||0), bins=12;
-      const min=Math.min(...vals), max=Math.max(...vals), bw=(max-min)/bins||1;
-      const counts=Array(bins).fill(0);
-      vals.forEach(v=>{const b=Math.min(Math.floor((v-min)/bw),bins-1);counts[b]++;});
-      document.getElementById('histTitle').innerHTML=`Distribution of <strong>${n1}</strong>`;
-      charts.hist=new Chart(document.getElementById('histChart'),{type:'bar',
-        data:{labels:counts.map((_,i)=>fmt(min+i*bw)),datasets:[{label:'Frequency',data:counts,backgroundColor:'rgba(157,23,77,.75)',borderRadius:3,barPercentage:.95,categoryPercentage:.95}]},
-        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
-          scales:{y:{beginAtZero:true,grid:{color:'rgba(0,0,0,.03)'}},x:{grid:{display:false}}}}});
-    }
-
-    /* Ranked horizontal bar */
-    if(cat&&n1){
-      const d=aggBy(cat,n1,8);
-      document.getElementById('hbarTitle').innerHTML=`<strong>${cat}</strong> Ranking`;
-      charts.hbar=new Chart(document.getElementById('hbarChart'),{type:'bar',
-        data:{labels:[...d.labels].reverse(),datasets:[{label:n1,data:[...d.data].reverse(),
-          backgroundColor:C.slice(0,d.labels.length).reverse(),borderRadius:4,barThickness:16}]},
-        options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
-          scales:{x:{beginAtZero:true,grid:{color:'rgba(0,0,0,.03)'}},y:{grid:{display:false}}}}});
-    }
-  }
-
-  function baseOpts(){
-    return{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{position:'top',align:'end',labels:{usePointStyle:true,boxWidth:8}}},
-      scales:{y:{beginAtZero:true,grid:{color:'rgba(0,0,0,.03)'}},x:{grid:{display:false}}}};
-  }
-
-  /* ── Table ── */
-  let sortCol=null,sortDir=1;
-  function renderTable(data,keys){
-    document.getElementById('rowCountBadge').textContent=data.length+' Records';
-    const head=document.getElementById('dataHeader'), body=document.getElementById('dataBody');
-    head.innerHTML='<tr>'+keys.map(k=>`<th data-col="${k}" ${k===sortCol?'style="color:var(--primary-color)"':''}>${String(k).replace(/_/g,' ')} <span style="opacity:.4;font-size:.68rem">${k===sortCol?(sortDir===1?'▲':'▼'):'⇅'}</span></th>`).join('')+'</tr>';
-    head.querySelectorAll('th').forEach(th=>{
-      th.style.cursor='pointer';
-      th.addEventListener('click',()=>{
-        const c=th.dataset.col;
-        sortCol===c?sortDir*=-1:(sortCol=c,sortDir=1);
-        const sd=[...gData].sort((a,b)=>{const va=a[c],vb=b[c];return typeof va==='number'?(va-vb)*sortDir:String(va).localeCompare(String(vb))*sortDir;});
-        renderTable(sd,keys);
-      });
+    // 4. Top Products by Stock
+    charts.main = new Chart(document.getElementById('mainChart'), {
+        type: 'bar',
+        data: {
+            labels: products.top_stock.map(p => p.product_name),
+            datasets: [{
+                label: 'Current Stock',
+                data: products.top_stock.map(p => p.quantity_stock),
+                backgroundColor: '#4f46e5'
+            }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
     });
-    body.innerHTML=data.slice(0,100).map(row=>'<tr>'+keys.map(k=>{
-      const v=row[k]===null||row[k]===undefined?'—':row[k];
-      const d=typeof v==='string'&&v.length>40?v.substring(0,38)+'…':v;
-      return`<td>${typeof v==='number'?`<span class="badge-num">${fmt(v)}</span>`:d}</td>`;
-    }).join('')+'</tr>').join('');
   }
-
-  /* table search */
-  document.getElementById('tableSearchInput').addEventListener('keyup',function(){
-    const f=this.value.toLowerCase();
-    document.querySelectorAll('#dataBody tr').forEach(tr=>{tr.style.display=tr.textContent.toLowerCase().includes(f)?'':'none';});
-  });
 
 });
 </script>

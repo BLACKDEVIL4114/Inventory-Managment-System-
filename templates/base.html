@@ -11,6 +11,13 @@
 </head>
 <body>
     <!-- Navigation -->
+    {% if 'sqlite' in (config.get('SQLALCHEMY_DATABASE_URI') or '') and os.environ.get('VERCEL') %}
+    <div style="background: #fffbeb; border-bottom: 2px solid #fcd34d; padding: 0.75rem; text-align: center; font-size: 0.85rem; color: #92400e; font-weight: 700; position: sticky; top: 0; z-index: 10000;">
+        <i class="fas fa-exclamation-circle" style="color: #d97706; font-size: 1.1rem; vertical-align: middle; margin-right: 0.5rem;"></i>
+        DATA LOSS WARNING: You are in "Temporary Mode" on Vercel. Your uploads will be deleted every few minutes.
+        <a href="https://github.com/your-repo/blob/main/database_setup_guide.md" style="margin-left: 1rem; padding: 0.3rem 0.8rem; background: #d97706; color: white; border-radius: 6px; text-decoration: none; font-size: 0.75rem;">Fix Permanently</a>
+    </div>
+    {% endif %}
     <nav class="navbar floating-nav">
         <div class="navbar-container">
             <a href="{{ url_for('dashboard') }}" class="navbar-brand luxury-logo">
@@ -27,6 +34,18 @@
             <div class="nav-wrapper" id="navWrapper">
                 <ul class="navbar-nav luxury-nav">
                 {% if current_user.is_authenticated %}
+                    <li class="nav-item">
+                        <span class="nav-link" style="opacity: 0.8; font-size: 0.75rem; display: flex; align-items: center; gap: 0.4rem;">
+                            <i class="fas fa-database"></i> 
+                            {% if 'sqlite' in (config.get('SQLALCHEMY_DATABASE_URI') or '') %}
+                                <span style="color: #f59e0b; font-weight: 700;">TEMPORARY MODE</span>
+                                <i class="fas fa-exclamation-triangle" style="color: #f59e0b; font-size: 0.6rem;" title="Data will be lost on refresh/restart"></i>
+                            {% else %}
+                                <span style="color: #10b981; font-weight: 700;">CLOUD STORAGE</span>
+                                <i class="fas fa-check-circle" style="color: #10b981; font-size: 0.6rem;" title="Persistence active"></i>
+                            {% endif %}
+                        </span>
+                    </li>
                     {% if current_user.role == 'manager' %}
                         <li><a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}"><i class="fas fa-home"></i> Home</a></li>
                         <li><a href="{{ url_for('products') }}" class="nav-link {% if request.endpoint == 'products' %}active{% endif %}"><i class="fas fa-boxes"></i> Products</a></li>

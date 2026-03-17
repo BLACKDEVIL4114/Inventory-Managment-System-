@@ -9,10 +9,11 @@ from flask_migrate import Migrate
 from flask_mail import Mail, Message
 from flask_wtf.csrf import CSRFProtect
 import pandas as pd
-from sqlalchemy import func
+import re
+from sqlalchemy import func, text
 from models import db, User, Product, Warehouse, Stock, Operation, StockMovement
 from forms import LoginForm, RegistrationForm, ProductForm, WarehouseForm, ForgotPasswordForm, ResetPasswordForm, UpdateProfileForm
-from utils import load_inventory_data, validate_csv_data, calculate_inventory_metrics
+from utils import validate_csv_data
 
 # Suppress warnings
 warnings.filterwarnings('ignore', category=UserWarning)
@@ -27,20 +28,22 @@ else:
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///inventory.db')
+# Database Configuration
+db_uri = os.environ.get('DATABASE_URL')
+if db_uri and db_uri.startswith("postgres://"):
+    db_uri = db_uri.replace("postgres://", "postgresql://", 1)
 
-# Vercel-specific database adjustments
-if os.environ.get('VERCEL'):
-    if app.config['SQLALCHEMY_DATABASE_URI'].startswith('sqlite:///'):
-        # SQLite must be in /tmp/ on Vercel to be writable (though not persistent)
-        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////tmp/inventory.db'
+if not db_uri:
+    # Local development fallback
+    db_path = os.path.join(os.getcwd(), 'inventory.db')
+    db_uri = f'sqlite:///{db_path}'
+    if os.environ.get('VERCEL'):
+        # Vercel temporary fallback (non-persistent)
+        db_uri = 'sqlite:////tmp/inventory.db'
 
-if app.config['SQLALCHEMY_DATABASE_URI'].startswith("postgres://"):
-    app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace("postgres://", "postgresql://", 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['UPLOAD_FOLDER'] = 'data_set'
-if os.environ.get('VERCEL'):
-    app.config['UPLOAD_FOLDER'] = '/tmp'
+app.config['UPLOAD_FOLDER'] = '/tmp' if os.environ.get('VERCEL') else 'data_set'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
 # Flask-Mail Configuration for Gmail SMTP
@@ -59,6 +62,14 @@ login_manager.login_view = 'login'
 login_manager.login_message_category = 'info'
 csrf = CSRFProtect(app)
 
+import os as _os_flask
+@app.context_processor
+def inject_now():
+    return {
+        'now': datetime.utcnow(),
+        'os': _os_flask
+    }
+
 # Flexible requirements: Only date and product_name are strictly required for analytics.
 # Others will be filled with defaults if missing.
 REQUIRED_ANALYTICS_COLUMNS = {'date', 'product_name'}
@@ -70,97 +81,191 @@ def is_known_product_name(name):
     return bool(value) and 'unknown' not in value
 
 
-def load_transaction_dataset(csv_path):
-    """Load and normalize transaction-style inventory CSV data with flexible columns."""
+def sync_csv_to_db(csv_path):
+    """Parse CSV and sync with DB models. Returns (bool, message)"""
     if not os.path.exists(csv_path):
-        return None
+        return False, "File does not exist"
 
     try:
-        df = pd.read_csv(csv_path)
-    except Exception:
-        return None
+        # Load data
+        if csv_path.endswith(('.xlsx', '.xls')):
+            df = pd.read_excel(csv_path)
+        else:
+            df = pd.read_csv(csv_path)
+    except Exception as e:
+        return False, f"Failed to read file: {str(e)}"
 
-    if not REQUIRED_ANALYTICS_COLUMNS.issubset(df.columns):
-        return None
+    if df.empty:
+        return False, "File is empty"
 
-    df = df.copy()
+    # ── Robust Column Detection ──
+    col_map = {}
+    norm_cols = {c.strip().lower().replace(' ', '_'): c for c in df.columns}
     
-    # Fill missing optional columns with sensible defaults
-    for col in OPTIONAL_ANALYTICS_COLUMNS:
-        if col not in df.columns:
-            if col in ['qty_received', 'qty_delivered', 'adjustment', 'stock_after']:
-                df[col] = 0
-            elif col == 'product_id':
-                df[col] = range(len(df))
-            elif col == 'warehouse':
-                df[col] = 'Default Warehouse'
-
-    df['date'] = pd.to_datetime(df['date'], errors='coerce')
-    for col in ['qty_received', 'qty_delivered', 'adjustment', 'stock_after']:
-        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
-    
-    df = df.dropna(subset=['date', 'product_name'])
-    df = df[df['product_name'].apply(is_known_product_name)]
-    return df
-
-
-def build_transaction_analytics(df):
-    """Build analytics payload from transaction-style dataset."""
-    price_per_unit = 2500.0
-
-    ordered = df.sort_values('date')
-    product_summary = (
-        ordered.groupby(['product_id', 'product_name'], as_index=False)
-        .agg(
-            quantity_stock=('stock_after', 'last'),
-            qty_received=('qty_received', 'sum'),
-            qty_delivered=('qty_delivered', 'sum'),
-            adjustment=('adjustment', 'sum')
-        )
-    )
-    product_summary['total_revenue'] = product_summary['qty_delivered'] * price_per_unit
-
-    daily = (
-        ordered.groupby('date', as_index=False)
-        .agg(
-            delivered=('qty_delivered', 'sum'),
-            received=('qty_received', 'sum'),
-            adjusted=('adjustment', 'sum')
-        )
-        .sort_values('date')
-    )
-
-    warehouse_summary = (
-        ordered.groupby('warehouse', as_index=False)
-        .agg(
-            qty_received=('qty_received', 'sum'),
-            qty_delivered=('qty_delivered', 'sum')
-        )
-        .sort_values('qty_delivered', ascending=False)
-    )
-
-    top_stock = product_summary.sort_values('quantity_stock', ascending=False).head(5).to_dict(orient='records')
-    low_stock = product_summary.sort_values('quantity_stock', ascending=True).head(5).to_dict(orient='records')
-    top_sales = product_summary.sort_values('qty_delivered', ascending=False).head(5).to_dict(orient='records')
-
-    total_sales = float(product_summary['total_revenue'].sum())
-    total_delivered = int(product_summary['qty_delivered'].sum())
-    total_received = int(product_summary['qty_received'].sum())
-    avg_order_value = total_sales / len(product_summary) if len(product_summary) else 0
-
-    return {
-        'total_sales': total_sales,
-        'average_order_value': avg_order_value,
-        'total_delivered_units': total_delivered,
-        'total_received_units': total_received,
-        'top_selling_products': top_stock,
-        'bottom_selling_products': low_stock,
-        'top_sales_products': top_sales,
-        'sales_trend_labels': daily['date'].dt.strftime('%d %b').tolist(),
-        'sales_trend_delivered': daily['delivered'].tolist(),
-        'sales_trend_received': daily['received'].tolist(),
-        'warehouse_breakdown': warehouse_summary.to_dict(orient='records'),
+    mapping_rules = {
+        'product_name': ['product_name', 'name', 'product', 'item_name', 'item', 'p_name', 'productname', 'title'],
+        'sku': ['sku', 'product_id', 'id', 'item_code', 'code', 'part_number', 'model_no', 'sku_no'],
+        'quantity_stock': ['quantity_stock', 'stock', 'quantity', 'qty', 'on_hand', 'quantity_on_hand', 'current_stock', 'inventory_level', 'count'],
+        'min_stock': ['minimum_stock_level', 'min_stock', 'min_level', 'alert_level', 'safety_stock', 'reorder_point'],
+        'unit_price': ['total_revenue', 'total_sales', 'revenue', 'price', 'unit_price', 'product_price', 'sale_price', 'mrp', 'rate'],
+        'cost_price': ['cost', 'cost_price', 'purchase_price', 'unit_cost', 'buying_price', 'wholesale_price'],
+        'category': ['category', 'group', 'type', 'class', 'department', 'family', 'tags'],
+        'warehouse': ['warehouse', 'loc', 'location', 'store', 'bin', 'rack', 'branch', 'hub'],
+        'date': ['date', 'timestamp', 'time', 'day', 'created_at', 'last_updated', 'transaction_date'],
+        'qty_received': ['qty_received', 'received', 'incoming', 'in', 'purchased', 'receipt_qty'],
+        'qty_delivered': ['qty_delivered', 'delivered', 'outgoing', 'out', 'sold', 'sale_qty', 'delivery_qty']
     }
+    
+    # Fill col_map with found column names
+    for target, aliases in mapping_rules.items():
+        for alias in aliases:
+            if alias in norm_cols:
+                col_map[target] = norm_cols[alias]
+                break
+    
+    # Simple helper to get mapped value
+    def get_val(row, key, default=None):
+        col = col_map.get(key)
+        if col and col in row:
+            val = row[col]
+            if pd.isna(val): return default
+            return val
+        return default
+
+    # Identify if it's a Transaction vs Summary file
+    # Transaction files must have a date and either incoming or outgoing movement
+    is_transaction = 'date' in col_map and \
+                     any(x in norm_cols for x in ['qty_received', 'qty_delivered', 'received', 'delivered', 'in', 'out'])
+    
+    try:
+        # 1. Ensure User exists for operations
+        creator_id = current_user.id if (current_user and not current_user.is_anonymous) else 1
+        
+        # 2. Map Warehouses
+        wh_map = {} # name -> id
+        
+        # 3. Process Rows
+        for _, row in df.iterrows():
+            pname = str(get_val(row, 'product_name', '')).strip()
+            if not pname or pname.lower() == 'nan': continue
+            
+            sku = str(get_val(row, 'sku', '')).strip()
+            if not sku or sku.lower() == 'nan': 
+                sku = f"PROD-{pname[:3].upper()}-{random.randint(100,999)}"
+            
+            # Find or Create Product
+            product = Product.query.filter((Product.name == pname) | (Product.sku == sku)).first()
+            if not product:
+                product = Product(name=pname, sku=sku)
+                db.session.add(product)
+            
+            # Update Product Metadata
+            cat = get_val(row, 'category')
+            if cat: product.category = str(cat)
+            
+            price = get_val(row, 'unit_price')
+            if price is not None:
+                try: 
+                    # Use re.sub for robust currency removal
+                    p_str = re.sub(r'[₹$, ]', '', str(price))
+                    p_val = float(p_str)
+                    product.unit_price = p_val
+                except: pass
+                
+            cost = get_val(row, 'cost_price')
+            if cost is not None:
+                try: 
+                    c_str = re.sub(r'[₹$, ]', '', str(cost))
+                    product.cost_price = float(c_str)
+                except: pass
+
+            mins = get_val(row, 'min_stock')
+            if mins is not None:
+                try: product.min_stock_level = int(mins)
+                except: pass
+            
+            db.session.flush() # Get product.id
+
+            # 4. Handle Warehouse
+            wh_name = str(get_val(row, 'warehouse', 'Main Warehouse')).strip()
+            if wh_name not in wh_map:
+                wh = Warehouse.query.filter_by(name=wh_name).first()
+                if not wh:
+                    wh = Warehouse(name=wh_name, location="Imported Zone")
+                    db.session.add(wh)
+                    db.session.flush()
+                wh_map[wh_name] = wh.id
+            
+            wh_id = wh_map[wh_name]
+
+            # 5. Stock Level (Snapshot)
+            q_stock = get_val(row, 'quantity_stock')
+            if q_stock is not None:
+                try:
+                    # Coerce to numeric
+                    qty_str = re.sub(r'[^0-9.]', '', str(q_stock))
+                    qty = int(float(qty_str))
+                    stock = Stock.query.filter_by(product_id=product.id, warehouse_id=wh_id).first()
+                    if not stock:
+                        stock = Stock(product_id=product.id, warehouse_id=wh_id)
+                        db.session.add(stock)
+                    
+                    diff = qty - (stock.quantity or 0)
+                    stock.quantity = qty
+                    
+                    # Synthesize Transaction for Summary Files (if it contributes to stock increase)
+                    if not is_transaction and diff != 0:
+                        s_type = 'Receipt' if diff > 0 else 'Adjustment'
+                        op = Operation(type=s_type, status='Done', timestamp=datetime.utcnow(), user_id=creator_id, supplier_name="System Sync")
+                        db.session.add(op); db.session.flush()
+                        db.session.add(StockMovement(
+                            operation_id=op.id, product_id=product.id, 
+                            to_warehouse_id=wh_id if diff > 0 else None,
+                            from_warehouse_id=wh_id if diff < 0 else None,
+                            quantity=abs(diff),
+                            unit_price=product.cost_price if diff > 0 else product.unit_price,
+                            total_price=abs(diff) * (product.cost_price if diff > 0 else product.unit_price)
+                        ))
+                except: pass
+
+            # 6. Movement (Operation)
+            if is_transaction:
+                m_date_raw = get_val(row, 'date')
+                m_date = pd.to_datetime(m_date_raw, errors='coerce')
+                if pd.isna(m_date): m_date = datetime.utcnow()
+                
+                # Use helper for movement amounts
+                def get_qty(keys):
+                    for k in keys:
+                        v = get_val(row, k)
+                        if v is not None:
+                            try:
+                                v_str = re.sub(r'[^0-9.]', '', str(v))
+                                return int(float(v_str))
+                            except: pass
+                    return 0
+
+                recv = get_qty(['qty_received', 'received', 'incoming', 'in'])
+                deliv = get_qty(['qty_delivered', 'delivered', 'outgoing', 'out'])
+                
+                if recv > 0:
+                    op = Operation(type='Receipt', status='Done', timestamp=m_date, user_id=creator_id, supplier_name="CSV Import")
+                    db.session.add(op); db.session.flush()
+                    db.session.add(StockMovement(operation_id=op.id, product_id=product.id, to_warehouse_id=wh_id, quantity=recv,
+                                                unit_price=product.cost_price, total_price=recv*product.cost_price))
+                    
+                if deliv > 0:
+                    op = Operation(type='Delivery', status='Done', timestamp=m_date, user_id=creator_id)
+                    db.session.add(op); db.session.flush()
+                    db.session.add(StockMovement(operation_id=op.id, product_id=product.id, from_warehouse_id=wh_id, quantity=deliv,
+                                                unit_price=product.unit_price, total_price=deliv*product.unit_price))
+
+        db.session.commit()
+        p_count = Product.query.count()
+        return True, f"Successfully synchronized {p_count} products to the persistent database. Your data is now safe."
+    except Exception as e:
+        db.session.rollback()
+        return False, f"Sync error: {str(e)}"
 
 
 def build_transaction_dashboard(df):
@@ -512,153 +617,125 @@ def health_check():
     }), 200
 
 @app.route("/")
+@app.route("/home")
 @app.route("/dashboard")
 @login_required
 def dashboard():
     if current_user.role == 'staff':
         return redirect(url_for('staff_panel'))
 
-    from datetime import datetime, date as date_type
+    # 1. Basic Stats from DB
+    all_products = Product.query.all()
+    total_products = len(all_products)
     
-    # Initialize all CSV-based metrics with defaults
-    total_revenue          = 0
-    health_score           = 0
-    growth_trend           = '—'
-    growth_is_positive     = True
-    csv_products_count     = 0
-    internal_transfers_csv = 0
-    sales_trend_labels    = []
-    sales_trend_delivered = []
-    sales_trend_received  = []
-    smart_insights        = [] # Global default for dashboard
-
-    # ── Step 1: ALWAYS query live database ──────────────────
-    all_products = [p for p in Product.query.all()
-                    if is_known_product_name(p.name)]
-    db_total_products = len(all_products)
-
-    low_stock_count    = 0
+    # 2. Stock Levels & Alerts
+    low_stock_count = 0
     out_of_stock_count = 0
-    low_stock_list     = []
+    low_stock_list = []
+    
     for p in all_products:
         total_qty = sum(s.quantity for s in p.stocks)
         if total_qty == 0:
             out_of_stock_count += 1
         if total_qty <= p.min_stock_level:
             low_stock_count += 1
-            status = 'OUT' if total_qty == 0 else (
-                'CRITICAL' if total_qty <= p.min_stock_level / 2
-                else 'LOW')
-            low_stock_list.append({
-                'name': p.name, 'sku': p.sku,
-                'qty': total_qty, 'unit': p.unit,
-                'status': status
-            })
+            status = 'OUT' if total_qty == 0 else ('CRITICAL' if total_qty <= p.min_stock_level/2 else 'LOW')
+            low_stock_list.append({'name': p.name, 'sku': p.sku, 'qty': total_qty, 'unit': p.unit, 'status': status})
 
-    pending_receipts   = Operation.query.filter_by(
-        type='Receipt',  status='Waiting').count()
-    pending_deliveries = Operation.query.filter_by(
-        type='Delivery', status='Waiting').count()
-    db_transfers       = Operation.query.filter_by(
-        type='Transfer').count()
+    # 3. Revenue & Growth
+    today = datetime.utcnow()
+    this_month_start = datetime(today.year, today.month, 1)
+    # Correct handling for month wrap-back
+    if today.month == 1:
+        last_month_start = datetime(today.year - 1, 12, 1)
+    else:
+        last_month_start = datetime(today.year, today.month - 1, 1)
 
-    today_start      = datetime.combine(
-        date_type.today(), datetime.min.time())
-    today_operations = Operation.query.filter(
-        Operation.timestamp >= today_start).count()
+    this_month_rev = db.session.query(func.sum(StockMovement.total_price))\
+        .join(Operation).filter(Operation.type == 'Delivery', Operation.timestamp >= this_month_start).scalar() or 0
+    
+    last_month_rev = db.session.query(func.sum(StockMovement.total_price))\
+        .join(Operation).filter(Operation.type == 'Delivery', Operation.timestamp >= last_month_start, Operation.timestamp < this_month_start).scalar() or 0
+    
+    total_revenue = db.session.query(func.sum(StockMovement.total_price))\
+        .join(Operation).filter(Operation.type == 'Delivery').scalar() or 0
 
-    all_warehouses       = Warehouse.query.all()
+    growth_pct = 0
+    if last_month_rev > 0:
+        growth_pct = ((this_month_rev - last_month_rev) / last_month_rev) * 100
+    
+    growth_trend = f"{growth_pct:+.1f}%"
+    growth_is_positive = growth_pct >= 0
+
+    # 4. Weekly Sales Trend
+    sales_trend_labels = []
+    sales_trend_delivered = []
+    sales_trend_received = []
+    
+    for i in range(6, -1, -1):
+        d = (today - timedelta(days=i)).date()
+        sales_trend_labels.append(d.strftime('%b %d'))
+        
+        d_start = datetime.combine(d, datetime.min.time())
+        d_end = datetime.combine(d, datetime.max.time())
+        
+        delivered = db.session.query(func.sum(StockMovement.quantity))\
+            .join(Operation).filter(Operation.type == 'Delivery', Operation.timestamp >= d_start, Operation.timestamp <= d_end).scalar() or 0
+        received = db.session.query(func.sum(StockMovement.quantity))\
+            .join(Operation).filter(Operation.type == 'Receipt', Operation.timestamp >= d_start, Operation.timestamp <= d_end).scalar() or 0
+            
+        sales_trend_delivered.append(int(delivered))
+        sales_trend_received.append(int(received))
+
+    # 5. Other KPIs
+    pending_receipts = Operation.query.filter_by(type='Receipt', status='Waiting').count()
+    pending_deliveries = Operation.query.filter_by(type='Delivery', status='Waiting').count()
+    internal_transfers = Operation.query.filter_by(type='Transfer').count()
+    today_operations = Operation.query.filter(Operation.timestamp >= datetime.combine(today.date(), datetime.min.time())).count()
+
+    # 6. Smart Insights
+    smart_insights = []
+    if low_stock_count > 0:
+        smart_insights.append({"type": "warning", "icon": "fa-exclamation-triangle", "text": f"Warning: {low_stock_count} products are below minimum stock level."})
+    
+    top_selling = db.session.query(Product.name, func.sum(StockMovement.quantity).label('total'))\
+        .join(StockMovement).join(Operation).filter(Operation.type == 'Delivery')\
+        .group_by(Product.id).order_by(text('total DESC')).first()
+        
+    if top_selling:
+        smart_insights.append({"type": "success", "icon": "fa-chart-line", "text": f"Bestseller: {top_selling[0]} is your top performing product."})
+
+    # 7. Warehouse Capacities
     warehouse_capacities = []
-    for wh in all_warehouses:
+    for wh in Warehouse.query.all():
         total_qty = sum(s.quantity for s in wh.stocks)
-        pct       = min(100, int((total_qty / 2000) * 100))
+        pct = min(100, int((total_qty / 2000) * 100))
         warehouse_capacities.append({'name': wh.name, 'pct': pct})
 
-    recent_operations = Operation.query.order_by(
-        Operation.timestamp.desc()).limit(5).all()
-
-    sales_trend_received  = []
-
-    # Path resolution: Priority to User Uploads then Repo Defaults
-    fresh_t = os.path.join(app.config['UPLOAD_FOLDER'], 'inventory_demo_dataset.csv')
-    fresh_s = os.path.join(app.config['UPLOAD_FOLDER'], 'data.csv')
-    repo_t = os.path.join('data_set', 'inventory_demo_dataset.csv')
-    repo_s = os.path.join('data_set', 'data.csv')
-
-    transaction_df = None
-    summary_df = None
-
-    # Priority 1: Fresh Transaction History
-    if os.path.exists(fresh_t):
-        transaction_df = load_transaction_dataset(fresh_t)
-    
-    # Priority 2: Fresh Summary Stock
-    if transaction_df is None and os.path.exists(fresh_s):
-        summary_df = load_inventory_data(fresh_s)
-    
-    # Priority 3: Demo Transaction (Repo)
-    if transaction_df is None and summary_df is None and os.path.exists(repo_t):
-        transaction_df = load_transaction_dataset(repo_t)
-    
-    # Priority 4: Demo Summary (Repo)
-    if transaction_df is None and summary_df is None and os.path.exists(repo_s):
-        summary_df = load_inventory_data(repo_s)
-
-    # Process the winner
-    if transaction_df is not None:
-        csv_data = build_transaction_dashboard(transaction_df)
-        total_revenue          = csv_data.get('total_revenue', 0)
-        health_score           = csv_data.get('health_score', 0)
-        growth_trend           = csv_data.get('growth_trend', '—')
-        growth_is_positive     = csv_data.get('growth_is_positive', True)
-        csv_products_count     = csv_data.get('total_products', 0)
-        internal_transfers_csv = csv_data.get('internal_transfers', 0)
-        
-        # Extract chart data
-        sales_trend_labels    = csv_data.get('sales_trend_labels', [])
-        sales_trend_delivered = csv_data.get('sales_trend_delivered', [])
-        sales_trend_received  = csv_data.get('sales_trend_received', [])
-        smart_insights        = csv_data.get('smart_insights', [])
-    elif summary_df is not None:
-        metrics = calculate_inventory_metrics(summary_df)
-        total_revenue      = metrics.get('total_revenue', 0)
-        csv_products_count = metrics.get('total_products', 0)
-        health_score       = 100 # Default if unknown
-        smart_insights     = [
-            {"type": "info", "icon": "fa-info-circle", "text": "Summary data loaded. Upload a transaction history CSV for advanced growth metrics."}
-        ]
-
-    # ── Step 3: Use best value for each KPI ─────────────────
-    # Total products: DB if has data, else CSV count
-    total_products = db_total_products if db_total_products > 0 \
-                     else csv_products_count
-
-    # Transfers: DB operations if any, else CSV warehouse count
-    internal_transfers = db_transfers if db_transfers > 0 \
-                         else internal_transfers_csv
+    recent_operations = Operation.query.order_by(Operation.timestamp.desc()).limit(5).all()
 
     return render_template('dashboard.html',
-        now                  = datetime.now(),
-        current_date         = datetime.now().strftime('%d %b %Y'),
-        total_products       = total_products,
-        low_stock_count      = low_stock_count,
-        out_of_stock_count   = out_of_stock_count,
-        pending_receipts     = pending_receipts,
-        pending_deliveries   = pending_deliveries,
-        internal_transfers   = internal_transfers,
-        today_operations     = today_operations,
-        total_revenue        = total_revenue,
-        health_score         = health_score,
-        growth_trend         = growth_trend,
-        growth_is_positive   = growth_is_positive,
-        sales_trend_labels   = sales_trend_labels,
-        sales_trend_delivered = sales_trend_delivered,
-        sales_trend_received = sales_trend_received,
-        low_stock_list       = low_stock_list[:5],
-        warehouse_capacities = warehouse_capacities,
-        recent_operations    = recent_operations,
-        smart_insights       = smart_insights,
-        dashboard_source     = 'live')
+        now=datetime.now(),
+        current_date=datetime.now().strftime('%d %b %Y'),
+        total_products=total_products,
+        low_stock_count=low_stock_count,
+        out_of_stock_count=out_of_stock_count,
+        pending_receipts=pending_receipts,
+        pending_deliveries=pending_deliveries,
+        internal_transfers=internal_transfers,
+        today_operations=today_operations,
+        total_revenue=total_revenue,
+        health_score=100 - min(100, (low_stock_count/total_products*100)) if total_products > 0 else 100,
+        growth_trend=growth_trend,
+        growth_is_positive=growth_is_positive,
+        sales_trend_labels=sales_trend_labels,
+        sales_trend_delivered=sales_trend_delivered,
+        sales_trend_received=sales_trend_received,
+        smart_insights=smart_insights,
+        warehouse_capacities=warehouse_capacities,
+        recent_operations=recent_operations,
+        low_stock_list=low_stock_list
+    )
 
 @app.route("/staff_panel")
 @login_required
@@ -1001,46 +1078,25 @@ def upload_analytics_csv():
         flash('Only CSV / Excel files are supported.', 'danger')
         return redirect(url_for('analytics'))
 
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    transaction_path = os.path.join(app.config['UPLOAD_FOLDER'], 'inventory_demo_dataset.csv')
-    summary_path = os.path.join(app.config['UPLOAD_FOLDER'], 'data.csv')
     temp_path = os.path.join(app.config['UPLOAD_FOLDER'], f'_upload_temp{ext}')
-
     try:
         file.save(temp_path)
-
-        # Try to load the uploaded file in a way that supports both CSV and Excel.
-        if ext in ['.xlsx', '.xls']:
-            df = pd.read_excel(temp_path)
-        else:
-            df = pd.read_csv(temp_path)
-
-        # Combine checks for target path
-        active_paths = {transaction_path, summary_path}
         
-        # Determine if the uploaded file is a transaction file or summary
-        if REQUIRED_ANALYTICS_COLUMNS.issubset(df.columns):
-            target_path = transaction_path
-            uploaded_source = 'transaction csv'
+        if ext in ['.xlsx', '.xls']:
+            success, msg = sync_csv_to_db(temp_path)
         else:
-            is_valid, message = validate_csv_data(df)
-            if is_valid:
-                target_path = summary_path
-                uploaded_source = 'summary csv'
-            else:
-                raise ValueError(message)
-
-        # Save to target and remove the OTHER one to prevent conflict
-        df.to_csv(target_path, index=False)
-        for old_path in active_paths:
-            if old_path != target_path and os.path.exists(old_path):
-                os.remove(old_path)
-
-        flash(f'File uploaded successfully. Active source: {uploaded_source}.', 'success')
+            success, msg = sync_csv_to_db(temp_path)
+            
+        if success:
+            db.session.commit() # Extra insurance
+            flash(msg, 'success')
+        else:
+            flash(msg, 'danger')
+            
     except Exception as e:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
         flash(f'Error uploading file: {str(e)}', 'danger')
+    finally:
+        if os.path.exists(temp_path): os.remove(temp_path)
 
     return redirect(url_for('analytics'))
 
@@ -1050,6 +1106,78 @@ def analytics():
     if current_user.role == 'staff':
         return redirect(url_for('staff_panel'))
     return render_template('analytics.html')
+
+# --- Analytics API Endpoints ---
+
+@app.route("/api/analytics/kpis")
+@login_required
+def api_kpis():
+    all_products = Product.query.all()
+    total_products = len(all_products)
+    low_stock = sum(1 for p in all_products if sum(s.quantity for s in p.stocks) <= p.min_stock_level)
+    
+    total_revenue = db.session.query(func.sum(StockMovement.total_price))\
+        .join(Operation).filter(Operation.type == 'Delivery').scalar() or 0
+    
+    avg_order = db.session.query(func.avg(StockMovement.total_price))\
+        .join(Operation).filter(Operation.type == 'Delivery').scalar() or 0
+
+    return jsonify({
+        "total_revenue": float(total_revenue),
+        "total_delivered": int(db.session.query(func.sum(StockMovement.quantity)).join(Operation).filter(Operation.type == 'Delivery').scalar() or 0),
+        "total_received": int(db.session.query(func.sum(StockMovement.quantity)).join(Operation).filter(Operation.type == 'Receipt').scalar() or 0),
+        "avg_order_value": float(avg_order),
+        "low_stock_count": low_stock
+    })
+
+@app.route("/api/analytics/revenue")
+@login_required
+def api_revenue():
+    # Last 30 days revenue trend
+    end_date = datetime.utcnow()
+    start_date = end_date - timedelta(days=30)
+    
+    results = db.session.query(
+        func.date(Operation.timestamp).label('date'),
+        func.sum(StockMovement.total_price).label('revenue')
+    ).join(StockMovement).filter(
+        Operation.type == 'Delivery',
+        Operation.timestamp >= start_date
+    ).group_by(func.date(Operation.timestamp)).order_by('date').all()
+    
+    return jsonify([{"date": str(r.date), "revenue": float(r.revenue)} for r in results])
+
+@app.route("/api/analytics/inventory")
+@login_required
+def api_inventory():
+    delivered = db.session.query(func.sum(StockMovement.quantity)).join(Operation).filter(Operation.type == 'Delivery').scalar() or 0
+    received = db.session.query(func.sum(StockMovement.quantity)).join(Operation).filter(Operation.type == 'Receipt').scalar() or 0
+    adjusted = db.session.query(func.sum(StockMovement.quantity)).join(Operation).filter(Operation.type == 'Adjustment').scalar() or 0
+    
+    return jsonify({
+        "delivered": int(delivered),
+        "received": int(received),
+        "adjusted": int(adjusted)
+    })
+
+@app.route("/api/analytics/products")
+@login_required
+def api_products():
+    top_sales = db.session.query(
+        Product.name, func.sum(StockMovement.quantity).label('total')
+    ).join(StockMovement).join(Operation).filter(Operation.type == 'Delivery')\
+    .group_by(Product.id).order_by(text('total DESC')).limit(5).all()
+    
+    top_stock = []
+    for p in Product.query.all():
+        qty = sum(s.quantity for s in p.stocks)
+        top_stock.append({"product_name": p.name, "quantity_stock": qty})
+    top_stock.sort(key=lambda x: x['quantity_stock'], reverse=True)
+    
+    return jsonify({
+        "top_sales": [{"product_name": r.name, "qty_delivered": int(r.total)} for r in top_sales],
+        "top_stock": top_stock[:5]
+    })
 
 # --- Initialization ---
 
@@ -1067,16 +1195,23 @@ def init_db():
         except:
             db.session.rollback()
 
-        # Add missing columns for Product and StockMovement (SQLite/Postgres)
+        # Add missing columns for all models (SQLite/Postgres)
         cols_to_add = [
             ('product', 'unit_price', 'FLOAT DEFAULT 0.0'),
             ('product', 'cost_price', 'FLOAT DEFAULT 0.0'),
+            ('product', 'category', 'VARCHAR(50)'),
+            ('product', 'unit', 'VARCHAR(20)'),
+            ('operation', 'supplier_name', 'VARCHAR(100)'),
             ('stock_movement', 'unit_price', 'FLOAT DEFAULT 0.0'),
             ('stock_movement', 'total_price', 'FLOAT DEFAULT 0.0'),
+            ('user', 'otp', 'VARCHAR(6)'),
+            ('user', 'otp_expiry', 'TIMESTAMP'),
         ]
         for table, col, col_type in cols_to_add:
             try:
-                db.session.execute(text(f'ALTER TABLE {table} ADD COLUMN {col} {col_type}'))
+                # Quote table name for 'user' which is reserved in Postgres
+                t_name = f'"{table}"' if table == 'user' else table
+                db.session.execute(text(f'ALTER TABLE {t_name} ADD COLUMN {col} {col_type}'))
                 db.session.commit()
             except:
                 db.session.rollback()
