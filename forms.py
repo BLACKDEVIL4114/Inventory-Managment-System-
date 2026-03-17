@@ -37,6 +37,8 @@ class ProductForm(FlaskForm):
     sku = StringField('SKU', validators=[DataRequired()])
     category = StringField('Category')
     unit = StringField('Unit (e.g. kg, piece)')
+    unit_price = IntegerField('Unit Price (Selling)', default=0)
+    cost_price = IntegerField('Cost Price', default=0)
     min_stock_level = IntegerField('Minimum Stock Level', default=10)
     warehouse_id = SelectField('Primary Warehouse', coerce=int, validators=[Optional()])
     submit = SubmitField('Save Product')

@@ -32,6 +32,8 @@ class Product(db.Model):
     sku = db.Column(db.String(50), unique=True, nullable=False)
     category = db.Column(db.String(50))
     unit = db.Column(db.String(20))  # kg, piece, liter, etc.
+    unit_price = db.Column(db.Float, default=0.0)
+    cost_price = db.Column(db.Float, default=0.0)
     min_stock_level = db.Column(db.Integer, default=10)
     stocks = db.relationship('Stock', backref='product', lazy=True)
 
@@ -62,6 +64,8 @@ class StockMovement(db.Model):
     from_warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouse.id'), nullable=True)
     to_warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouse.id'), nullable=True)
     quantity = db.Column(db.Integer, nullable=False)
+    unit_price = db.Column(db.Float, default=0.0)
+    total_price = db.Column(db.Float, default=0.0)
 
     # Add relationships for convenience
     product = db.relationship('Product', backref='movements', lazy=True)

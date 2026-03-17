@@ -1064,25 +1064,39 @@ def init_db():
         from sqlalchemy import text
         try:
             db.session.execute(text('ALTER TABLE "user" ALTER COLUMN password_hash TYPE VARCHAR(256)'))
-            db.session.commit()
-        except Exception as e:
-            # Table might not exist yet or column already altered
+        except:
             db.session.rollback()
+
+        # Add missing columns for Product and StockMovement (SQLite/Postgres)
+        cols_to_add = [
+            ('product', 'unit_price', 'FLOAT DEFAULT 0.0'),
+            ('product', 'cost_price', 'FLOAT DEFAULT 0.0'),
+            ('stock_movement', 'unit_price', 'FLOAT DEFAULT 0.0'),
+            ('stock_movement', 'total_price', 'FLOAT DEFAULT 0.0'),
+        ]
+        for table, col, col_type in cols_to_add:
+            try:
+                db.session.execute(text(f'ALTER TABLE {table} ADD COLUMN {col} {col_type}'))
+                db.session.commit()
+            except:
+                db.session.rollback()
 
         # Seed products if empty
         if not Product.query.first():
             demo_prods = [
-                {'name': 'Industrial Motor XL', 'sku': 'IND-MOT-001', 'category': 'Machinery', 'unit': 'unit', 'min': 5},
-                {'name': 'Copper Wire 100m', 'sku': 'ELE-WIR-052', 'category': 'Electrical', 'unit': 'roll', 'min': 20},
-                {'name': 'Steel Bolts M8', 'sku': 'FAS-BLT-008', 'category': 'Fasteners', 'unit': 'box', 'min': 50},
-                {'name': 'Hydraulic Oil 20L', 'sku': 'LUB-OIL-020', 'category': 'Lubricants', 'unit': 'can', 'min': 10},
-                {'name': 'Safety Helmet', 'sku': 'PPE-HLM-001', 'category': 'Safety', 'unit': 'unit', 'min': 15},
-                {'name': 'Welding Rods E6013', 'sku': 'WLD-ROD-613', 'category': 'Welding', 'unit': 'kg', 'min': 30},
-                {'name': 'Bearing 6204-2RS', 'sku': 'MCH-BRG-204', 'category': 'Mechanical', 'unit': 'unit', 'min': 40},
-                {'name': 'LED Panel 40W', 'sku': 'LGT-PAN-040', 'category': 'Lighting', 'unit': 'unit', 'min': 12},
+                {'name': 'Industrial Motor XL', 'sku': 'IND-MOT-001', 'category': 'Machinery', 'unit': 'unit', 'min': 5, 'price': 15000, 'cost': 12000},
+                {'name': 'Copper Wire 100m', 'sku': 'ELE-WIR-052', 'category': 'Electrical', 'unit': 'roll', 'min': 20, 'price': 2500, 'cost': 1800},
+                {'name': 'Steel Bolts M8', 'sku': 'FAS-BLT-008', 'category': 'Fasteners', 'unit': 'box', 'min': 50, 'price': 1200, 'cost': 800},
+                {'name': 'Hydraulic Oil 20L', 'sku': 'LUB-OIL-020', 'category': 'Lubricants', 'unit': 'can', 'min': 10, 'price': 4500, 'cost': 3200},
+                {'name': 'Safety Helmet', 'sku': 'PPE-HLM-001', 'category': 'Safety', 'unit': 'unit', 'min': 15, 'price': 850, 'cost': 500},
+                {'name': 'Welding Rods E6013', 'sku': 'WLD-ROD-613', 'category': 'Welding', 'unit': 'kg', 'min': 30, 'price': 1500, 'cost': 1100},
+                {'name': 'Bearing 6204-2RS', 'sku': 'MCH-BRG-204', 'category': 'Mechanical', 'unit': 'unit', 'min': 40, 'price': 600, 'cost': 400},
+                {'name': 'LED Panel 40W', 'sku': 'LGT-PAN-040', 'category': 'Lighting', 'unit': 'unit', 'min': 12, 'price': 1800, 'cost': 1200},
             ]
             for p_data in demo_prods:
-                p = Product(name=p_data['name'], sku=p_data['sku'], category=p_data['category'], unit=p_data['unit'], min_stock_level=p_data['min'])
+                p = Product(name=p_data['name'], sku=p_data['sku'], category=p_data['category'], 
+                            unit=p_data['unit'], min_stock_level=p_data['min'],
+                            unit_price=p_data['price'], cost_price=p_data['cost'])
                 db.session.add(p)
             db.session.commit()
 
