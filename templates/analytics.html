@@ -204,6 +204,9 @@
         <button class="tbtn" id="exportCsvBtn"><i class="fas fa-file-csv"></i> Export CSV</button>
         <button class="tbtn" id="exportImgBtn"><i class="fas fa-image"></i> Save Image</button>
         <button class="tbtn" id="resetBtn"><i class="fas fa-sync-alt"></i> New File</button>
+        <button class="tbtn" id="cancelAnalysisBtn" style="display:none; color:#dc2626; border-color:#fca5a5;">
+          <i class="fas fa-stop-circle"></i> Cancel Analysis
+        </button>
       </div>
     </div>
 
@@ -326,6 +329,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const insightsList = document.getElementById('insightsList');
 
   let charts = {main:null,donut:null,line:null,scatter:null,hist:null,hbar:null};
+  let analysisController = null;  // AbortController for cancel support
   const C = ['#dc2626','#9d174d','#f43f5e','#ef4444','#991b1b','#fca5a5','#4f46e5','#10b981','#f59e0b','#06b6d4'];
 
   /* ── Page Init ── */
@@ -359,6 +363,24 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('fileInput').value = '';
     window.scrollTo({top:0,behavior:'smooth'});
   };
+
+  document.getElementById('cancelAnalysisBtn').addEventListener('click', () => {
+    if (analysisController) {
+      analysisController.abort();
+      analysisController = null;
+    }
+    // Destroy charts
+    Object.values(charts).forEach(c => { if(c) c.destroy(); });
+    charts = {main:null,donut:null,line:null,scatter:null,hist:null,hbar:null};
+    // Reset UI
+    document.getElementById('dashboardContainer').style.display = 'none';
+    document.getElementById('uploadZone').style.display = 'flex';
+    document.getElementById('loadingOverlay').style.display = 'none';
+    document.getElementById('cancelAnalysisBtn').style.display = 'none';
+    document.getElementById('lastUpdatedBadge').textContent = 'AWAITING DATA';
+    document.getElementById('lastUpdatedBadge').style.background = 'var(--gray-800)';
+    window.scrollTo({top:0,behavior:'smooth'});
+  });
 
   document.getElementById('resetBtn').addEventListener('click', () => {
     dashCont.style.display='none'; uploadZone.style.display='flex';
@@ -400,12 +422,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   /* ── Data Fetching ── */
   async function loadRealData() {
+    analysisController = new AbortController();
+    const signal = analysisController.signal;
+    document.getElementById('cancelAnalysisBtn').style.display = 'inline-flex';
     try {
         const [kpiRes, revRes, invRes, prodRes] = await Promise.all([
-            fetch('/api/analytics/kpis'),
-            fetch('/api/analytics/revenue'),
-            fetch('/api/analytics/inventory'),
-            fetch('/api/analytics/products')
+            fetch('/api/analytics/kpis', {signal}),
+            fetch('/api/analytics/revenue', {signal}),
+            fetch('/api/analytics/inventory', {signal}),
+            fetch('/api/analytics/products', {signal})
         ]);
 
         const kpis = await kpiRes.json();
@@ -415,11 +440,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         renderDashboard(kpis, revenue, inventory, products);
         dashCont.style.display = 'block';
+        analysisController = null;
+        document.getElementById('cancelAnalysisBtn').style.display = 'none';
         uploadZone.style.display = 'none';
         document.getElementById('lastUpdatedBadge').textContent = 'LIVE – ' + new Date().toLocaleTimeString();
     } catch (err) {
-        console.error('Failed to load analytics:', err);
-        // If no data, keep upload zone visible
+        if (err.name === 'AbortError') {
+            console.log('Analysis cancelled by user.');
+        } else {
+            console.error('Failed to load analytics:', err);
+        }
+        document.getElementById('cancelAnalysisBtn').style.display = 'none';
+        analysisController = null;
     }
   }
 
