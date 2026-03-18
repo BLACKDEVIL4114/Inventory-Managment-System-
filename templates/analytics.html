@@ -201,12 +201,9 @@
     <div class="toolbar">
       <h2><i class="fas fa-file-csv" style="color:var(--primary-color)"></i> <span id="datasetNameLabel">Dataset</span></h2>
       <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
-        <button class="tbtn" id="exportCsvBtn"><i class="fas fa-file-csv"></i> Export CSV</button>
+        <button class="tbtn" id="cancelAnalysisBtn" style="color:#dc2626; border-color:#fca5a5; background:rgba(220,38,38,0.05);" onclick="cancelAnalysis()"><i class="fas fa-stop-circle"></i> Cancel Analysis</button>
         <button class="tbtn" id="exportImgBtn"><i class="fas fa-image"></i> Save Image</button>
         <button class="tbtn" id="resetBtn"><i class="fas fa-sync-alt"></i> New File</button>
-        <button class="tbtn" id="cancelAnalysisBtn" style="display:none; color:#dc2626; border-color:#fca5a5;">
-          <i class="fas fa-stop-circle"></i> Cancel Analysis
-        </button>
       </div>
     </div>
 
@@ -364,23 +361,20 @@ document.addEventListener('DOMContentLoaded', () => {
     window.scrollTo({top:0,behavior:'smooth'});
   };
 
-  document.getElementById('cancelAnalysisBtn').addEventListener('click', () => {
+  window.cancelAnalysis = function() {
     if (analysisController) {
       analysisController.abort();
       analysisController = null;
     }
-    // Destroy charts
     Object.values(charts).forEach(c => { if(c) c.destroy(); });
     charts = {main:null,donut:null,line:null,scatter:null,hist:null,hbar:null};
-    // Reset UI
     document.getElementById('dashboardContainer').style.display = 'none';
     document.getElementById('uploadZone').style.display = 'flex';
     document.getElementById('loadingOverlay').style.display = 'none';
-    document.getElementById('cancelAnalysisBtn').style.display = 'none';
     document.getElementById('lastUpdatedBadge').textContent = 'AWAITING DATA';
     document.getElementById('lastUpdatedBadge').style.background = 'var(--gray-800)';
     window.scrollTo({top:0,behavior:'smooth'});
-  });
+  };
 
   document.getElementById('resetBtn').addEventListener('click', () => {
     dashCont.style.display='none'; uploadZone.style.display='flex';
@@ -424,7 +418,6 @@ document.addEventListener('DOMContentLoaded', () => {
   async function loadRealData() {
     analysisController = new AbortController();
     const signal = analysisController.signal;
-    document.getElementById('cancelAnalysisBtn').style.display = 'inline-flex';
     try {
         const [kpiRes, revRes, invRes, prodRes] = await Promise.all([
             fetch('/api/analytics/kpis', {signal}),
@@ -441,7 +434,6 @@ document.addEventListener('DOMContentLoaded', () => {
         renderDashboard(kpis, revenue, inventory, products);
         dashCont.style.display = 'block';
         analysisController = null;
-        document.getElementById('cancelAnalysisBtn').style.display = 'none';
         uploadZone.style.display = 'none';
         document.getElementById('lastUpdatedBadge').textContent = 'LIVE – ' + new Date().toLocaleTimeString();
     } catch (err) {
@@ -450,7 +442,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             console.error('Failed to load analytics:', err);
         }
-        document.getElementById('cancelAnalysisBtn').style.display = 'none';
         analysisController = null;
     }
   }
